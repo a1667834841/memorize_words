@@ -25,10 +25,10 @@ export default function Home({ navigateTo }: { navigateTo: (page: 'wordMatchingG
   const [hoverCardIndex, setHoverCardIndex] = useState<number | null>(null)
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24">
+    <main className="flex max-h-screen flex-col items-center justify-center p-2 sm:p-2 mx-2 md:p-5 mx-2 mt-20">
       {/* 标题 */}
-      <div className="text-4xl font-bold mb-10 mt-[-200px]">
-        我要记单词
+      <div className="text-4xl font-bold mb-10 mt-5">
+        我要记单词!
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full max-w-[600px]">
         {games.map((game, index) => (
@@ -36,7 +36,7 @@ export default function Home({ navigateTo }: { navigateTo: (page: 'wordMatchingG
             onMouseEnter={() => setHoverCardIndex(index)}
             onMouseLeave={() => setHoverCardIndex(null)}
             key={index}
-            className={`aspect-square flex items-center justify-center font-bold text-base sm:text-lg md:text-xl transition-all duration-300 hover:rounded-lg relative ${
+            className={`aspect-square flex items-center justify-center font-bold text-base sm:text-lg md:text-xl transition-all duration-300 mx-2hover:rounded-lg relative ${
               game.enable 
                 ? "bg-black text-white cursor-pointer hover:bg-white hover:text-black hover:border-4 hover:border-black" 
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"

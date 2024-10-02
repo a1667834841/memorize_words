@@ -7,13 +7,9 @@ import { Word } from '@/types/words'
 const storyTypes = [
   { title: "现实主义", description: "描述日常生活中的真实情感、社会问题或人物命运，着重刻画现实环境中的人性和社会现象。" },
   { title: "科幻", description: "以科学理论为基础，想象未来科技发展可能对社会、人类及宇宙产生的影响。" },
-  { title: "魔幻现实主义", description: "将魔幻元素融入现实背景中，通过奇幻情节反映现实生活中的荒诞和复杂性。" },
   { title: "悬疑", description: "通过巧妙的情节设计和引人入胜的悬念，营造紧张刺激的氛围，通常涉及谜题、犯罪或解密。" },
-  { title: "爱情", description: "聚焦人物之间的情感关系，描绘爱情中的甜蜜、冲突、误解与成长。" },
-  { title: "历史", description: "以历史事件或人物为背景，讲述历史中的某一段经历，探索时代背景下的人性和命运。" },
   { title: "武侠", description: "以古代江湖为背景，围绕侠义精神和武术展开，塑造英雄人物和他们的冒险经历。" },
   { title: "玄幻", description: "通过虚构的世界、超自然的力量和神秘的元素构建故事，通常有复杂的设定和强烈的幻想色彩。" },
-  { title: "心理", description: "侧重人物的内心世界，深入剖析人物的心理活动、情感波动及心灵成长。" },
   { title: "讽刺", description: "通过讽刺和幽默的手法，揭露社会现象、政治弊端或人性弱点，常带有批判性和戏谑性。" },
 ]
 
@@ -53,11 +49,12 @@ export function MemoryMasterComponent() {
     setIsGenerating(true)
     setGeneratedStory("")
     const prompt = `请创作一个充满荒诞但合情合理的${selectedStoryType}风格短故事。故事需要包含指定的单词：${selectedWords.map(word => word.english).join(", ")}，且每个单词只出现一次。故事情节要夸张、荒诞，让人印象深刻，出乎意料又合乎逻辑，最重要的是结尾需要反转，引人深思。要求如下：
-1.模仿这几位作家的手法：阿加莎·克里斯蒂、欧·亨利 (O. Henry)、乔治·R·R·马丁 、吉莉安·弗琳、 东野圭吾、斯蒂芬·金 
-2.输出内容使用中文。
-3.使用到的单词左边用<标记，右边用>标记
-4.单词需要在故事中用到贴切，切不可滥用
-5.总字数应控制在${selectedWords.length * 80}字左右。`
+1.可以模仿这几位作家的手法：阿加莎·克里斯蒂、欧·亨利 (O. Henry)、乔治·R·R·马丁 、吉莉安·弗琳、 东野圭吾、斯蒂芬·金 
+2.输出的内容符合中文小说剧情，出现的角色名称需要是符合中国人，出现的地点只能属于中国
+3.输出内容使用中文。
+4.使用到的单词左边用<标记，右边用>标记
+5.包含的单词不可丢失单词需要在故事中用到贴切，切不可滥用
+6.总字数应控制在${selectedWords.length * 80}字左右。`
 
     try {
       const response = await fetch('/api/generate-story', {
@@ -131,7 +128,7 @@ export function MemoryMasterComponent() {
               onClick={() => handleStoryTypeSelection(type.title)}
               className="w-full h-auto py-2 flex flex-col items-center justify-center text-center"
             >
-              <span className="font-bold text-sm">{type.title}</span>
+              <span className="font-bold text-sm" title={type.description}>{type.title}</span>
               {/* <span className="text-[10px] mt-1 break-words w-full px-2 whitespace-normal">{type.description}</span> */}
             </Button>
           ))}
