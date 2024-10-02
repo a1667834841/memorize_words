@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from "@/components/ui/button"
 import { Word } from '@/types/words'
 
@@ -23,6 +23,7 @@ export function MemoryMasterComponent() {
   const [selectedStoryType, setSelectedStoryType] = useState<string>("")
   const [generatedStory, setGeneratedStory] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
+  const storyRef = useRef<HTMLDivElement>(null)
   
 
   useEffect(() => {
@@ -50,12 +51,13 @@ export function MemoryMasterComponent() {
 
   const generateStory = async () => {
     setIsGenerating(true)
+    setGeneratedStory("")
     const prompt = `请创作一个充满荒诞但合情合理的${selectedStoryType}风格短故事。故事需要包含指定的单词：${selectedWords.map(word => word.english).join(", ")}，且每个单词只出现一次。故事情节要夸张、荒诞，让人印象深刻，出乎意料又合乎逻辑，最重要的是结尾需要反转，引人深思。要求如下：
 1.模仿这几位作家的手法：阿加莎·克里斯蒂、欧·亨利 (O. Henry)、乔治·R·R·马丁 、吉莉安·弗琳、 东野圭吾、斯蒂芬·金 
 2.输出内容使用中文。
 3.使用到的单词左边用<标记，右边用>标记
 4.单词需要在故事中用到贴切，切不可滥用
-5.总字数应控制在${selectedWords.length * 80}字左右。。`
+5.总字数应控制在${selectedWords.length * 80}字左右。`
 
     try {
       const response = await fetch('/api/generate-story', {
@@ -70,8 +72,22 @@ export function MemoryMasterComponent() {
         throw new Error('Story generation failed')
       }
 
-      const data = await response.json()
-      setGeneratedStory(data.story)
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('Failed to get reader from response')
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          break
+        }
+        const chunk = new TextDecoder().decode(value)
+        setGeneratedStory(prev => prev + chunk)
+        if (storyRef.current) {
+          storyRef.current.scrollTop = storyRef.current.scrollHeight
+        }
+      }
     } catch (error) {
       console.error('Error generating story:', error)
       setGeneratedStory("抱歉，生成故事时出现错误。请稍后再试。")
@@ -132,10 +148,11 @@ export function MemoryMasterComponent() {
       </Button>
 
       {/* 生成的故事显示区域 */}
-      {generatedStory && (
+      {(generatedStory || isGenerating) && (
         <div className="mt-8">
           <h2 className="text-xl sm:text-2xl font-semibold mb-4">生成的故事</h2>
           <div
+            ref={storyRef}
             className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap text-sm font-mono tracking-wide"
           >
             {generatedStory.split(/(<[^>]+>)/).map((part, index) => {
@@ -144,22 +161,22 @@ export function MemoryMasterComponent() {
                 const matchedWord = words.find(w => w.english.toLowerCase() === word.toLowerCase());
                 if (matchedWord) {
                   return (
-                    <span>
-                    <span 
-                      key={index}
-                      className="inline-block bg-black text-white px-1 py-0.5 rounded cursor-pointer"
-                      onClick={() => {/* 这里可以添加点击事件处理逻辑 */}}
-                      title={matchedWord.chinese}
-                    >
-                      {matchedWord.english} 
-                    </span>
-                    <span className="text-gray-500 text-xs">（{matchedWord.chinese}）</span>
+                    <span key={index}>
+                      <span 
+                        className="inline-block bg-black text-white px-1 py-0.5 rounded cursor-pointer"
+                        onClick={() => {/* 这里可以添加点击事件处理逻辑 */}}
+                        title={matchedWord.chinese}
+                      >
+                        {matchedWord.english} 
+                      </span>
+                      <span className="text-gray-500 text-xs">（{matchedWord.chinese}）</span>
                     </span>
                   );
                 }
               }
               return part;
             })}
+            {isGenerating && <span className="animate-pulse">|</span>}
           </div>
         </div>
       )}

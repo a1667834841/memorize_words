@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         ],
         temperature: 0.7,
         max_tokens: 1000,
+        stream: true, // 启用流式传输
       }),
     })
 
@@ -27,10 +28,48 @@ export async function POST(request: Request) {
       throw new Error('DeepSeek API request failed')
     }
 
-    const data = await response.json()
-    const generatedStory = data.choices[0].message.content
+    // 创建一个 ReadableStream
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = response.body?.getReader()
+        if (!reader) {
+          controller.close()
+          return
+        }
 
-    return NextResponse.json({ story: generatedStory })
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) {
+            break
+          }
+          const chunk = new TextDecoder().decode(value)
+          const lines = chunk.split('\n').filter(line => line.trim() !== '')
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (data === '[DONE]') {
+                controller.close()
+                return
+              }
+              try {
+                const parsed = JSON.parse(data)
+                const content = parsed.choices[0].delta.content
+                if (content) {
+                  controller.enqueue(content)
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e)
+              }
+            }
+          }
+        }
+        controller.close()
+      }
+    })
+
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    })
   } catch (error) {
     console.error('Error calling DeepSeek API:', error)
     return NextResponse.json({ error: 'Failed to generate story' }, { status: 500 })
