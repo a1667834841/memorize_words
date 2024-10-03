@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Word } from '@/types/words'
 import { globalCache,saveCache } from './app-router'
 import ReactMarkdown from 'react-markdown'
+import { storyPromptTemplate } from '@/app/utils/promptTemplates'
 
 const storyTypes = [
   { title: "现实主义", description: "描述日常生活中的真实情感、社会问题或人物命运，着重刻画现实环境中的人性和社会现象。" },
@@ -57,14 +58,10 @@ export function MemoryMasterComponent() {
   const generateStory = async () => {
     setIsGenerating(true)
     setGeneratedStory("")
-    const prompt = `请创作一个充满荒诞但合情合理的${selectedStoryType}风格短故事。故事需要包含指定的单词：${selectedWords.map(word => word.english).join(", ")}，使用中文编故事，将故事中用的单词翻译成英文。故事情节要夸张、荒诞，让人印象深刻，出乎意料又合乎逻辑，最重要的是结尾需要反转，引人深思。要求如下：
-1.可以模仿这几位作家的手法：阿加莎·克里斯蒂、欧·亨利 (O. Henry)、乔治·R·R·马丁 、吉莉安·弗琳、 东野圭吾、斯蒂芬·金 
-2.输出的内容符合中文小说剧情，出现的角色名称需要是符合中国人，出现的地点只能属于中国
-3.包含的单词不可丢失单词需要在故事中用到贴切，切不可滥用
-4.总字数应控制在${selectedWords.length * 50}字左右。`
+    const prompt = storyPromptTemplate(selectedStoryType, selectedWords.map(word => word.english+"（"+word.type+"）"), selectedWords.length * 50)
 
     try {
-      const response = await fetch('/api/generate-story', {
+      const response = await fetch('/api/generate-story-gemini', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,7 +84,9 @@ export function MemoryMasterComponent() {
           break
         }
         const chunk = new TextDecoder().decode(value)
-        setGeneratedStory(prev => prev + chunk.trim())
+        const processedChunk = chunk.replace(/[（(]([a-zA-Z]+)[）)]/g, '$1')
+        .replace("{humanized_text}","").replace("```中文","").replace("```","")
+        setGeneratedStory(prev => prev + processedChunk.trim())
         if (storyRef.current) {
           storyRef.current.scrollTop = storyRef.current.scrollHeight
         }
@@ -116,25 +115,41 @@ export function MemoryMasterComponent() {
       {/* 生成的故事显示区域 */}
       {(generatedStory || isGenerating) && (
         <div className="mt-8">
-          <h2 className="text-xl sm:text-2xl font-semibold mb-4">生成的故事</h2>
           <div
             ref={storyRef}
             className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap text-sm font-mono tracking-wide"
           >
-            <ReactMarkdown>
-              {generatedStory.split(/(<[^>]+>)/).map((part, index) => {
-                if (part.startsWith('<') && part.endsWith('>')) {
-                  const word = part.slice(1, -1);
-                  const matchedWord = words.find(w => w.english.toLowerCase() === word.toLowerCase());
-                  if (matchedWord) {
-                    return `**${matchedWord.english}** (${matchedWord.chinese})`;
-                  }
-                }
-                return part;
-              }).join('')}
-            </ReactMarkdown>
+            <div>
+              {generatedStory.split('## Humanized text')[1] && generatedStory.split('## Humanized text')[1].split(' ').map((word, index) => {
+                const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
+                const isSelectedWord = selectedWords.some(sw => sw.english.toLowerCase() === cleanWord.toLowerCase());
+                return isSelectedWord ? (
+                  <Button
+                    key={index}
+                    variant="ghost"
+                    className="px-1 py-0 h-auto font-bold bg-gray-200 hover:bg-gray-300"
+                  >
+                    {word}
+                  </Button>
+                ) : (
+                  <span key={index}>{word} </span>
+                );
+              })}
+            </div>
             {isGenerating && <span className="animate-pulse">|</span>}
           </div>
+          {isGenerating && (
+            <div className="mt-4">
+              <p className="text-sm">
+                当前进度：
+                { generatedStory.includes('## Humanized text')
+                  ? <span className="animate-pulse">输出故事中...</span>
+                  : generatedStory.includes('## Rules to ensure a perfect humanized text')
+                  ? <span className="animate-pulse">组织语言中...</span>
+                  : <span className="animate-pulse">单词和故事类型分析中...</span>}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

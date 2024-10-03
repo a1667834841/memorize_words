@@ -14,7 +14,7 @@ export function WordMatchingGameComponent() {
   const [selectedEnglish, setSelectedEnglish] = useState<string | null>(null)
   const [selectedChinese, setSelectedChinese] = useState<string | null>(null)
   const [score, setScore] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(20) // 将初始时间设置为60秒
+  const [timeLeft, setTimeLeft] = useState(30) // 将初始时间设置为60秒
   const [gameOver, setGameOver] = useState(false)
   const [matchedPair, setMatchedPair] = useState<{ english: string; chinese: string } | null>(null)
   const [fadingOutWords, setFadingOutWords] = useState<{ english: string; chinese: string }[] | []>([])
@@ -135,7 +135,7 @@ export function WordMatchingGameComponent() {
     const shuffled = [...words].sort(() => 0.5 - Math.random())
     setGameWords(shuffled.slice(0, 60))
     setScore(0)
-    setTimeLeft(gameWords.length+8)
+    setTimeLeft(gameWords.length+18)
     setGameOver(false)
     setSelectedEnglish(null)
     setSelectedChinese(null)
