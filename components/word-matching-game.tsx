@@ -1,47 +1,52 @@
 "use client"
 
-import { useState, useEffect,useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import Link from 'next/link'
 import Confetti from 'react-confetti'
-
-import cet4Words from '@/data/cet4-words.json'
-
-// 替换原来的 words 常量
-const words = cet4Words
-
+import { globalCache, saveCache } from '@/components/app-router'
+import { Word } from '@/types/words'
 export function WordMatchingGameComponent() {
-  const [gameWords, setGameWords] = useState<typeof words>([])
-  const [displayWords, setDisplayWords] = useState<{english: typeof words, chinese: typeof words}>({ english: [], chinese: [] })
+  const [words, setWords] = useState<Word[]>([])
+  const [gameWords, setGameWords] = useState<Word[]>([])
+  const [displayWords, setDisplayWords] = useState<{english: Word[], chinese: Word[]}>({ english: [], chinese: [] })
   const [selectedEnglish, setSelectedEnglish] = useState<string | null>(null)
   const [selectedChinese, setSelectedChinese] = useState<string | null>(null)
   const [score, setScore] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(60) // 将初始时间设置为60秒
+  const [timeLeft, setTimeLeft] = useState(20) // 将初始时间设置为60秒
   const [gameOver, setGameOver] = useState(false)
   const [matchedPair, setMatchedPair] = useState<{ english: string; chinese: string } | null>(null)
   const [fadingOutWords, setFadingOutWords] = useState<{ english: string; chinese: string }[] | []>([])
 
   const [showConfetti, setShowConfetti] = useState(false)
-  const [matchedWords, setMatchedWords] = useState<typeof words>([])
+  const [matchedWords, setMatchedWords] = useState<Word[]>([])
+  const [misMatchedWords, setMisMatchedWords] = useState<Word[]>([])
   const [hiddenWords, setHiddenWords] = useState<{ english: string; chinese: string }[]>([])
   const [mismatchedPair, setMismatchedPair] = useState<{ english: string; chinese: string } | null>(null)
 
-  const [isFirstPlay, setIsFirstPlay] = useState(true)
 
   // 新增一个状态来控制游戏是否已开始
   const [gameStarted, setGameStarted] = useState(false)
 
-  const [words, setWords] = useState<Array<{ english: string; chinese: string }>>([])
-
   useEffect(() => {
-    // 获取单词
-    fetch('/api/words?count=60')
-      .then(response => response.json())
-      .then(data => {
-        setWords(data)
-        setGameWords(data)
-      })
+    // 检查缓存中是否有单词
+    if (globalCache.words && globalCache.words.length > 0) {
+      setWords(globalCache.words)
+      setGameWords(globalCache.words)
+    } else {
+      // 如果缓存中没有单词，则从API获取
+      fetch('/api/words?count=10')
+        .then(response => response.json())
+        .then((data: Word[]) => {
+          setWords(data)
+          setGameWords(data)
+          // 将获取的单词存入全局缓存
+          globalCache.words = data
+          saveCache()
+          setTimeLeft(gameWords.length)
+        })
+    }
   }, [])
 
   useEffect(() => {
@@ -108,6 +113,14 @@ export function WordMatchingGameComponent() {
           setSelectedChinese(null)
       } else {
         setMismatchedPair({ english: selectedEnglish, chinese: selectedChinese })
+        // 添加匹配错误的word,去重
+        const wrongWord = words.find(word => word.english === selectedEnglish)
+        console.log(wrongWord)
+        if (wrongWord && misMatchedWords.find(word => word.english === wrongWord.english)) {
+          return
+        }
+        setMisMatchedWords(prevMisMatchedWords => wrongWord? [...prevMisMatchedWords, wrongWord] : prevMisMatchedWords)
+
         // 为了只显示一次且时间为0.5秒的错误提示，这里使用setTimeout
         setTimeout(() => {
           setMismatchedPair(null)
@@ -122,7 +135,7 @@ export function WordMatchingGameComponent() {
     const shuffled = [...words].sort(() => 0.5 - Math.random())
     setGameWords(shuffled.slice(0, 60))
     setScore(0)
-    setTimeLeft(60)
+    setTimeLeft(gameWords.length+8)
     setGameOver(false)
     setSelectedEnglish(null)
     setSelectedChinese(null)
@@ -131,8 +144,8 @@ export function WordMatchingGameComponent() {
     setFadingOutWords([])
     setMatchedWords([])
     setHiddenWords([])
-    setIsFirstPlay(false)  // 设置为非首次游戏
     setGameStarted(true)
+    saveCache()
   }
 
   const hideWord = useCallback((word: { english: string; chinese: string }) => {
@@ -150,6 +163,7 @@ export function WordMatchingGameComponent() {
       <h1 className="text-3xl font-bold text-center mb-4">单词匹配游戏</h1>
       <div className="flex justify-between mb-4">
         <div className="text-xl">得分: {score}</div>
+        <div className='text-xl'>单词错误数: {misMatchedWords.length}</div>
         <div className="text-xl">时间: {timeLeft}s</div>
       </div>
       {!gameStarted ? (
@@ -225,7 +239,7 @@ export function WordMatchingGameComponent() {
                   opacity: fadingOutWords.some(w => w.chinese === word.chinese) ? 0 : 1,
                   scale: fadingOutWords.some(w => w.chinese === word.chinese) ? 0.8 : 1,
                 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.3 }}
                 onAnimationComplete={() => {
                   if (fadingOutWords.some(w => w.chinese === word.chinese)) {
                     hideWord(word)

@@ -2,41 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import { Word } from '@/types/words'
-import { globalCache,saveCache } from './app-router'
 
 
-export function DailyVocabularyComponent() {
+export function VocabularyBookComponent() {
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (globalCache.words && globalCache.words.length > 0) {
-      // 清空选中状态
-      globalCache.words.forEach(word => {
-        word.selected = false
-      })
-      setWords(globalCache.words)
-      setLoading(false)
-    } else {
-      fetch('/api/words?count=12&mode=random&type=all')
+   
+      fetch('/api/words?count=60&mode=random&type=all')
         .then(response => response.json())
         .then((data: Word[]) => {
           setWords(data)
           setLoading(false)
-          globalCache.words = data
-          saveCache()
         })
         .catch(error => {
           console.error('Error fetching words:', error)
           setLoading(false)
         })
-    }
+    
   }, [])
 
-  useEffect(() => {
-    globalCache.words = words
-    saveCache()
-  }, [words])
     
 
   const playAudio = (word: string, type: number) => {

@@ -1,36 +1,80 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import Home from '@/app/home'
 import { WordMatchingGameComponent } from '@/components/word-matching-game'
 import { DailyVocabularyComponent } from '@/components/daily-vocabulary'
-import dynamic from 'next/dynamic'
 import { MemoryMasterComponent } from '@/components/memory-master'
+import { BackButton } from '@/components/BackButton'
+import { NextButton } from '@/components/NextButton'
+import { VocabularyBookComponent } from '@/components/vocabulary-book'
+import { Word } from '@/types/words'
 
-// 动态导入 Home 组件
-const Home = dynamic(() => import('@/app/home'), { 
-  loading: () => <p>加载中...</p>,
-  ssr: false 
-})
 
-// 定义页面类型
-type Page = 'home' | 'wordMatchingGame' | 'dailyVocabulary' | 'memoryGame'
+// 定义 GlobalCache 接口
+export interface GlobalCache {
+  words?: Word[];
+  [key: string]: any;
+}
 
+// 创建全局缓存对象
+export const globalCache: GlobalCache = {}
+
+// 从 localStorage 加载缓存
+export const loadCache = () => {
+  if (typeof window !== 'undefined') {
+    const savedCache = localStorage.getItem('globalCache')
+    if (savedCache) {
+      Object.assign(globalCache, JSON.parse(savedCache))
+    }
+  }
+}
+
+// 保存缓存到 localStorage
+export const saveCache = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('globalCache', JSON.stringify(globalCache))
+  }
+}
+
+// 申明game类型
+export type Page = {
+  name: string
+  route: string
+  enable: boolean,
+  display: boolean,
+  description?: string
+  component: React.ComponentType<any> | null
+}
+
+export const pages: Page[] = [
+  { name: "首页", route: 'home', enable: true, display:false, description: "首页" ,component: Home},
+  { name: "今日单词", route: 'dailyVocabulary', enable: true,display:true, description: "查看今日单词进行学习" ,component: DailyVocabularyComponent},
+  { name: "记忆大师", route: 'memoryGame', enable: true, display:true, description: "ai根据今日单词生成故事" ,component: MemoryMasterComponent},
+  { name: "单词消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分" ,component: WordMatchingGameComponent  },
+  { name: "单词本", route: 'vocabularyBook', enable: true,display:true, description: "查看单词本" ,component: VocabularyBookComponent},
+  { name: "错题本", route: 'errorBook', enable: false, display:true, description: "敬请期待" ,component: null},
+]
+
+// 定义页面类
 export function AppRouter() {
-  const [currentPage, setCurrentPage] = useState<Page>('home')
+  const [currentPage, setCurrentPage] = useState<Page>(pages[0])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    loadCache()
     setIsLoading(false)
   }, [])
 
   // 页面切换函数
   const navigateTo = (page: Page) => {
+    if(!page.enable) return
     setCurrentPage(page)
   }
 
   // 返回首页函数
   const goHome = () => {
-    setCurrentPage('home')
+    setCurrentPage(pages[0])
   }
 
   // 渲染当前页面
@@ -38,33 +82,19 @@ export function AppRouter() {
     if (isLoading) {
       return <div>加载中...</div>
     }
-
-    switch (currentPage) {
-      case 'home':
-        return <Home navigateTo={(page: 'wordMatchingGame' | 'dailyVocabulary' | 'memoryGame' | 'errorBook') => navigateTo(page as Page)} />
-      case 'wordMatchingGame':
-        return (
-          <div className="relative">
-            <BackButton goHome={goHome} />
-            <WordMatchingGameComponent />
-          </div>
-        )
-      case 'dailyVocabulary':
-        return (
-          <div className="relative">
-            <BackButton goHome={goHome} />
-            <DailyVocabularyComponent />
-          </div>
-        )
-      case 'memoryGame':
-        return (
-          <div className="relative">
-            <BackButton goHome={goHome} />
-            <MemoryMasterComponent />
-          </div>
-        )
-      default:
-        return <div>页面不存在</div>
+    if (currentPage.route === 'home') {
+      return <Home navigateTo={navigateTo} />
+    } else if (currentPage != null && currentPage.component != null) {
+      const PageComponent = currentPage.component
+      return (
+        <div className="relative">
+          <BackButton page={pages[0]} navigateTo={navigateTo} />
+          <PageComponent navigateTo={navigateTo} />
+          <NextButton page={pages.indexOf(currentPage) == pages.length - 1 ? currentPage: pages[pages.indexOf(currentPage)+1] } navigateTo={navigateTo} />
+        </div>
+      )
+    } else {
+      return <div>404</div>
     }
   }
 
@@ -72,19 +102,5 @@ export function AppRouter() {
     <div>
       {renderPage()}
     </div>
-  )
-}
-
-// 返回按钮组件
-const BackButton = ({ goHome }: { goHome: () => void }) => {
-  return (
-    <button 
-      onClick={goHome}
-      className="absolute top-4 left-4 p-2 bg-gray-200 hover:bg-gray-300 rounded-full"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-    </button>
   )
 }
