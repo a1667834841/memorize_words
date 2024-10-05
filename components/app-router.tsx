@@ -9,7 +9,7 @@ import { BackButton } from '@/components/BackButton'
 import { NextButton } from '@/components/NextButton'
 import { VocabularyBookComponent } from '@/components/vocabulary-book'
 import { Word } from '@/types/words'
-
+import TodayDialogComponent from './today-dialog';
 
 // 定义 GlobalCache 接口
 export interface GlobalCache {
@@ -51,6 +51,7 @@ export const pages: Page[] = [
   { name: "首页", route: 'home', enable: true, display:false, description: "首页" ,component: Home},
   { name: "今日单词", route: 'dailyVocabulary', enable: true,display:true, description: "查看今日单词进行学习" ,component: DailyVocabularyComponent},
   { name: "记忆大师", route: 'memoryGame', enable: true, display:true, description: "ai根据今日单词生成故事" ,component: MemoryMasterComponent},
+  {name:"今日对话",route:"todayDialog",enable:true,display:true,description:"与超自然ai对话",component:TodayDialogComponent},
   { name: "单词消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分" ,component: WordMatchingGameComponent  },
   { name: "单词本", route: 'vocabularyBook', enable: true,display:true, description: "查看单词本" ,component: VocabularyBookComponent},
   { name: "错题本", route: 'errorBook', enable: false, display:true, description: "敬请期待" ,component: null},

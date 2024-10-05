@@ -1,60 +1,95 @@
-import { NextResponse } from 'next/server'
-import cet4Words from '@/data/cet4-words.json'
-import { Word,WordCache } from '@/types/words'
-interface RawWord {
-  word: string;
-  translations: Array<{
-    translation: string;
-    type: string;
-  }>;
-}
-// 创建一个简单的缓存对象
-let cache: WordCache | null = null
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { Word } from '@/types/words';
 
-function convertToWord(rawWord: RawWord): Word {
-  return {
-    english: rawWord.word,
-    chinese: rawWord.translations[0].translation,
-    type: rawWord.translations[0].type,
-    // 如果有难度信息，可以在这里添加
-  };
-}
+const prisma = new PrismaClient();
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const count = parseInt(searchParams.get('count') || '10')
-  const mode = searchParams.get('mode') || 'random' || 'ordered'
-  const type = searchParams.get('type') || 'all'
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
+    const search = searchParams.get('search') || '';
 
-  const today = new Date().toDateString()
-  // 检查缓存是否存在且是今天的数据
-  if (cache && cache.date === today) {
-    console.log('使用缓存的单词数据')
-  } else {
-    console.log('生成新的单词数据并缓存')
-    let words = (cet4Words as RawWord[]).map(convertToWord)
+    const skip = (page - 1) * pageSize;
 
-    
-    // 根据类型筛选单词
-    if (type !== 'all') {
-      words = words.filter(word => word.type === type)
-    }
+    // 查询总数
+    const totalCount = await prisma.words.count({
+      where: {
+        word: {
+          contains: search,
+        },
+      },
+    });
 
-    // 根据模式选择单词
-    if (mode === 'ordered') {
-      words = words.slice(0, count)
-    } else {
-        // 随机选取count个单词
-      words = words.sort(() => Math.random() - 0.5).slice(0, count)
-      words = words.slice(0, count)
-    }
+    // 查询单词
+    const rawWords = await prisma.words.findMany({
+      where: {
+        word: {
+          contains: search,
+        },
+      },
+      skip,
+      take: pageSize,
+      orderBy: {
+        word: 'asc',
+      },
+    });
 
-    // 更新缓存
-    cache = {
-      date: today,
-      words: words
-    }
+    // 获取单词的短语
+    const phrasesMap = await getPhrasesMap(rawWords);
+
+    // 转换为Word对象
+    const words: Word[] = rawWords.map((word) => ({
+      english: word.word,
+      chinese: word.translation,
+      type: word.type || '',
+      translations: [{
+        chinese: word.translation,
+        type: word.type || '',
+      }],
+      phrases: phrasesMap.get(word.word) || [],
+    }));
+
+    return NextResponse.json({
+      words,
+      pagination: {
+        currentPage: page,
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    });
+  } catch (error) {
+    console.error('获取单词列表失败:', error);
+    return NextResponse.json({ error: '获取单词列表失败' }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
+}
 
-  return NextResponse.json(cache?.words || [])
+async function getPhrasesMap(rawWords: any) {
+  const phrases = await prisma.phrases.findMany({
+    where: {
+      word: {
+        in: rawWords.map((word: any) => word.word),
+      },
+    },
+  });
+
+  const phrasesMap = new Map<string, { phrase: string; chinese: string }[]>();
+  phrases.forEach((phrase) => {
+    if (phrasesMap.has(phrase.word)) {
+      phrasesMap.get(phrase.word)?.push({
+        phrase: phrase.phrase,
+        chinese: phrase.translation,
+      });
+    } else {
+      phrasesMap.set(phrase.word, [{
+        phrase: phrase.phrase,
+        chinese: phrase.translation,
+      }]);
+    }
+  });
+  return phrasesMap;
 }

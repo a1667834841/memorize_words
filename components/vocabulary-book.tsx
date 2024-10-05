@@ -1,19 +1,25 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Word } from '@/types/words'
+import { Word,Pagination } from '@/types/words'
 
 
 export function VocabularyBookComponent() {
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState<Pagination>({
+    currentPage: 1,
+    pageSize: 30,
+    totalCount: 0,
+  })
 
   useEffect(() => {
    
-      fetch('/api/words?count=60&mode=random&type=all')
+      fetch(`/api/words?page=${pagination.currentPage}&pageSize=${pagination.pageSize}`)
         .then(response => response.json())
-        .then((data: Word[]) => {
-          setWords(data)
+        .then((data: {words: Word[], pagination: Pagination}) => {
+          setWords(data.words)
+          setPagination(data.pagination)
           setLoading(false)
         })
         .catch(error => {
@@ -31,12 +37,20 @@ export function VocabularyBookComponent() {
   }
 
   if (loading) {
-    return <div className="text-center">加载中...</div>
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <svg className="animate-spin h-10 w-10 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span className="ml-3 text-lg">加载中...</span>
+      </div>
+    )
   }
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold text-center mb-6">今日单词本</h1>
+      <h1 className="text-3xl font-bold text-center mb-6">单词本</h1>
       <div className=" text-gray-500 text-center mb-4">
         {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
       </div>
@@ -44,7 +58,7 @@ export function VocabularyBookComponent() {
         {words.map((word, index) => (
           <div 
             key={index} 
-            className={`border p-4 rounded-lg shadow relative cursor-pointer transition-colors duration-300 ${word.selected ? 'bg-black text-white' : 'bg-white text-black'}`}
+            className={`border p-4 rounded-lg shadow relative cursor-pointer transition-colors duration-300`}
             onClick={() => {
               setWords(prevWords => prevWords.map((w, i) => 
                 i === index ? {...w, selected: !w.selected} : w
@@ -53,12 +67,32 @@ export function VocabularyBookComponent() {
           >
             <div className="mb-8">
               <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">{word.english}</h2>
-              <p className="text-base sm:text-lg md:text-xl text-gray-600">{word.chinese}</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-2">类型: {word.type}</p>
+              <div className="text-sm sm:text-base">
+                {Object.entries(word.translations.reduce<Record<string, string[]>>((acc, t) => {
+                  (acc[t.type] = acc[t.type] || []).push(t.chinese);
+                  return acc;
+                }, {})).map(([type, translations]) => (
+                  <p key={type}>
+                    <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      
+                    }}
+                    className="font-medium">{type}:
+                    {translations.map((translation, index) => (
+                      <span className={`ml-2 p-0.5 border-b-2 border-dotted my-1 border-black`}>
+                        {translation}
+                      </span>
+                    ))}
+                      </span> 
+                 
+                  </p>
+                ))}
+              </div>
             </div>
             <div className="absolute bottom-2 left-2 flex space-x-2">
               <button 
-                className={`hover:text-gray-700 flex items-center ${word.selected ? 'text-white' : 'text-gray-500'}`}
+                className={`hover:text-gray-700 flex items-center`}
                 title="英式发音"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -71,7 +105,7 @@ export function VocabularyBookComponent() {
                 <span className="ml-1 text-sm sm:text-base">英</span>
               </button>
               <button 
-                className={`hover:text-gray-700 flex items-center ${word.selected ? 'text-white' : 'text-gray-500'}`}
+                className={`hover:text-gray-700 flex items-center`}
                 title="美式发音"
                 onClick={(e) => {
                   e.stopPropagation();

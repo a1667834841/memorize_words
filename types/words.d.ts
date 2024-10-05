@@ -15,12 +15,31 @@ export interface Word {
   english: string;
   chinese: string;
   type: string;
+  translations: Translation[];
+  phrases: Phrase[];
   difficulty?: string;
   selected?: boolean; // 添加选中状态属性
   hitCount?: number; // 添加命中次数属性
 }
 
+export interface Translation {
+  chinese: string;
+  type: string;
+}
+
+export interface Phrase {
+  phrase: string;
+  chinese: string;
+}
+
 export interface WordCache {
   date: string;
   words: Word[];
+}
+
+export interface Pagination {
+  currentPage: number;
+  pageSize: number;
+  totalCount: number;
+  currentPage: number;
 }

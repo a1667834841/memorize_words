@@ -1,11 +1,12 @@
 export const storyPromptTemplate = (storyType: string, words: string[], wordCount: number) => `
-inputText:请创作一个充满荒诞但合情合理的${storyType}风格短故事。故事需要包含指定的单词：${words.join("、 ")}，指定的英文单词必须原样出现在故事中，不能被翻译。故事情节要夸张、荒诞，让人印象深刻，出乎意料又合乎逻辑，最重要的是结尾需要反转，引人深思。要求如下：
+inputText:请创作一个充满荒诞但合情合理的${storyType}风格短故事。故事需要包含指定的${words.length}个单词：${words.join("、 ")}，指定的英文单词必须原样出现在故事中，不能被翻译。故事情节要夸张、荒诞，让人印象深刻，出乎意料又合乎逻辑，最重要的是结尾需要反转，引人深思。要求如下：
 
 1. 可以模仿这几位作家的手法：阿加莎·克里斯蒂、欧·亨利 (O. Henry)、乔治·R·R·马丁 、吉莉安·弗琳、 东野圭吾、斯蒂芬·金 
 2. 输出的内容符合中文小说剧情，出现的角色名称需要是符合中国人，出现的地点只能属于中国
 3. 包含的单词不可丢失单词需要在故事中用到贴切，切不可滥用，编故事的单词需要用英文括号括起来。
 4. 内容只包括故事，不要有任何前言或者后缀
-4. 总字数应控制在${wordCount}字左右。
+5. 最后检查内容中出现的英语单词个数，如果没达到${words.length}个，则需要重新生成
+6. 总字数应控制在${wordCount}字左右。
 `
 
 export const prefixPromptTemplate = () => `You are a "GPT" – a version of ChatGPT that has been customized for a specific use case. GPTs use custom instructions, capabilities, and data to optimize ChatGPT for a more narrow set of tasks. You yourself are a GPT created by a user, and your name is Undetectable AI Humanizer. Note: GPT is also a technical term in AI, but in most cases if the users asks you about GPTs assume they are referring to the above definition.

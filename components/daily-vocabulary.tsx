@@ -18,7 +18,7 @@ export function DailyVocabularyComponent() {
       setWords(globalCache.words)
       setLoading(false)
     } else {
-      fetch('/api/words?count=12&mode=random&type=all')
+      fetch('/api/daily-words')
         .then(response => response.json())
         .then((data: Word[]) => {
           setWords(data)
@@ -67,8 +67,28 @@ export function DailyVocabularyComponent() {
           >
             <div className="mb-8">
               <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">{word.english}</h2>
-              <p className="text-base sm:text-lg md:text-xl text-gray-600">{word.chinese}</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-2">类型: {word.type}</p>
+              <div className="text-sm sm:text-base">
+                {Object.entries(word.translations.reduce<Record<string, string[]>>((acc, t) => {
+                  (acc[t.type] = acc[t.type] || []).push(t.chinese);
+                  return acc;
+                }, {})).map(([type, translations]) => (
+                  <p key={type}>
+                    <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      
+                    }}
+                    className="font-medium">{type}:
+                    {translations.map((translation, index) => (
+                      <span className={`ml-2 p-0.5 border-b-2 border-dotted my-1 ${word.selected ? 'border-white' : 'border-black'}`}>
+                        {translation}
+                      </span>
+                    ))}
+                      </span> 
+                 
+                  </p>
+                ))}
+              </div>
             </div>
             <div className="absolute bottom-2 left-2 flex space-x-2">
               <button 

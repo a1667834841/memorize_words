@@ -135,7 +135,7 @@ export function WordMatchingGameComponent() {
     const shuffled = [...words].sort(() => 0.5 - Math.random())
     setGameWords(shuffled.slice(0, 60))
     setScore(0)
-    setTimeLeft(gameWords.length+18)
+    setTimeLeft(30)
     setGameOver(false)
     setSelectedEnglish(null)
     setSelectedChinese(null)

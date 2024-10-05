@@ -23,14 +23,13 @@ export function MemoryMasterComponent() {
   const [generatedStory, setGeneratedStory] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const storyRef = useRef<HTMLDivElement>(null)
-  
 
   useEffect(() => {
     if (globalCache.words && globalCache.words.length > 0) {
       setWords(globalCache.words)
       setSelectedWords(globalCache.words.filter(word => word.selected))
     } else {
-      fetch('/api/words?count=12&mode=random&type=all')
+      fetch('/api/daily-words')
         .then(response => response.json())
         .then((data: Word[]) => {
           setWords(data)
@@ -99,59 +98,71 @@ export function MemoryMasterComponent() {
     }
   }
 
+  const highlightWords = (text: string) => {
+    if (!text || text === undefined) {
+      return text
+    }
+    // 移除开头的换行符
+    text = text.trimStart();
+    const regex = new RegExp(`\\b(${selectedWords.map(word => word.english).join('|')})\\b`, 'gi');
+    return text.split(regex).map((part, index) => 
+      regex.test(part) ? <Button key={index} className="py-0 px-1 h-auto font-bold">{part}</Button> : part
+    );
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">记忆大师</h1>
       
-      {/* 生成故事按钮 */}
-      <Button 
-        className="mt-4 w-full"
-        disabled={selectedWords.length === 0 || !selectedStoryType || isGenerating}
-        onClick={generateStory}
-      >
-        {isGenerating ? "正在生成故事..." : "生成故事"}
-      </Button>
-
-      {/* 生成的故事显示区域 */}
-      {(generatedStory || isGenerating) && (
+       {/* 生成的故事显示区域 */}
+       {(generatedStory || isGenerating) && (
         <div className="mt-8">
           <div
             ref={storyRef}
-            className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap text-sm font-mono tracking-wide"
+            className="w-full h-auto p-2 border rounded overflow-auto text-sm font-mono tracking-wide text-left align-top whitespace-pre-wrap"
+            style={{
+              transition: 'all 0.5s ease',
+              animation: 'fadeIn 0.5s ease-in-out'
+            }}
           >
-            <div>
-              {generatedStory.split('## Humanized text')[1] && generatedStory.split('## Humanized text')[1].split(' ').map((word, index) => {
-                const cleanWord = word.replace(/[.,!?;:'"()]/g, '');
-                const isSelectedWord = selectedWords.some(sw => sw.english.toLowerCase() === cleanWord.toLowerCase());
-                return isSelectedWord ? (
-                  <Button
-                    key={index}
-                    variant="ghost"
-                    className="px-1 py-0 h-auto font-bold bg-gray-200 hover:bg-gray-300"
-                  >
-                    {word}
-                  </Button>
-                ) : (
-                  <span key={index}>{word} </span>
-                );
-              })}
-            </div>
-            {isGenerating && <span className="animate-pulse">|</span>}
+            {highlightWords(generatedStory.split('## Humanized text')[1])}
           </div>
           {isGenerating && (
             <div className="mt-4">
               <p className="text-sm">
                 当前进度：
                 { generatedStory.includes('## Humanized text')
-                  ? <span className="animate-pulse">输出故事中...</span>
+                  ? <span className="animate-pulse">输出故事中<span className="inline-block animate-bounce">...</span></span>
                   : generatedStory.includes('## Rules to ensure a perfect humanized text')
-                  ? <span className="animate-pulse">组织语言中...</span>
-                  : <span className="animate-pulse">单词和故事类型分析中...</span>}
+                  ? <span className="animate-pulse">组织语言中<span className="inline-block animate-spin">...</span></span>
+                  : <span className="animate-pulse">单词和故事类型分析中<span className="inline-block animate-spin">...</span></span>}
               </p>
             </div>
           )}
         </div>
       )}
+
+      {/* 生成故事按钮 */}
+      { (
+        <div className="mt-4 flex flex-row gap-2 w-full">
+      <Button 
+        className={`mt-4 ${!isGenerating && generatedStory ? 'w-1/2' : 'w-full'}`}
+        disabled={selectedWords.length === 0 || !selectedStoryType || isGenerating}
+        onClick={generateStory}
+        
+      >
+        {isGenerating ? "正在生成故事..." : "生成故事"}
+      </Button>
+      {!isGenerating && generatedStory &&<Button 
+        className="mt-4 w-1/2"
+        onClick={() => setGeneratedStory("")}
+      >
+          复制文本
+        </Button>
+      }
+      </div>
+      )}
+
 
       {/* 单词选择区域 */}
       <div className="mb-8">
@@ -162,11 +173,12 @@ export function MemoryMasterComponent() {
               key={index}
               variant={selectedWords.includes(word) ? "default" : "outline"}
               onClick={() => handleWordSelection(word)}
-              className="w-full h-10  sm:text-sm"
+              className="w-full h-auto py-3  sm:text-sm truncate"
             >
               {word.english}
-              <br className="sm:hidden" />
-              <span className="text-[10px] sm:text-xs text-gray-500 sm:ml-1 ml-1 whitespace-normal">{word.chinese}</span>
+              <div className="sm:text-[15px] ml-2 text-[10px]">
+                {word.translations[0].chinese}
+              </div>
             </Button>
           ))}
         </div>
