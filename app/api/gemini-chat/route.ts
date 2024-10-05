@@ -1,7 +1,6 @@
 import { StreamingTextResponse } from 'ai'
-import { GoogleGenerativeAI } from '@fuyun/generative-ai'
-import { prefixPromptTemplate } from '@/app/utils/promptTemplates'
-import { json } from 'stream/consumers'
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@fuyun/generative-ai'
+import { chatPromptTemplate } from '@/app/utils/promptTemplates'
 
 const baseUrl = 'https://gemini.baipiao.io'
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
@@ -9,17 +8,33 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 export async function POST(request: Request) {
   const { messages } = await request.json()
 
+  const safetySettings = [
+    {
+      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+      threshold: HarmBlockThreshold.BLOCK_NONE,
+    }
+  ];  
+
   if (!process.env.GEMINI_API_KEY) {
     console.error('GEMINI_API_KEY is not set')
     return new Response('API key is not configured', { status: 500 })
   }
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' },{baseUrl})
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' ,safetySettings},{baseUrl})
     const result = await model.generateContentStream({
         contents: messages,
+        systemInstruction: chatPromptTemplate(),
         generationConfig: {
           maxOutputTokens: 2000,
-          temperature: 0.5
+          temperature: 1,
         },
       })
     //   const chat = model.startChat(
@@ -33,6 +48,7 @@ export async function POST(request: Request) {
       async start(controller) {
         for await (const chunk of result.stream ) {
           const chunkText = chunk.text()
+          console.log('chunkText', chunkText)
           controller.enqueue(new TextEncoder().encode(chunkText))
         }
         controller.close()

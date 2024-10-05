@@ -44,16 +44,19 @@ export type Page = {
   enable: boolean,
   display: boolean,
   description?: string
-  component: React.ComponentType<any> | null
+  component: React.ComponentType<any> | null,
+  hasBackButton?: boolean,
+  hasNextButton?: boolean
+
 }
 
 export const pages: Page[] = [
-  { name: "首页", route: 'home', enable: true, display:false, description: "首页" ,component: Home},
-  { name: "今日单词", route: 'dailyVocabulary', enable: true,display:true, description: "查看今日单词进行学习" ,component: DailyVocabularyComponent},
-  { name: "记忆大师", route: 'memoryGame', enable: true, display:true, description: "ai根据今日单词生成故事" ,component: MemoryMasterComponent},
-  {name:"今日对话",route:"todayDialog",enable:true,display:true,description:"与超自然ai对话",component:TodayDialogComponent},
-  { name: "单词消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分" ,component: WordMatchingGameComponent  },
-  { name: "单词本", route: 'vocabularyBook', enable: true,display:true, description: "查看单词本" ,component: VocabularyBookComponent},
+  { name: "首页", route: 'home', enable: true, display:false, description: "首页" ,component: Home,hasBackButton:false,hasNextButton:false},
+  { name: "今日单词", route: 'dailyVocabulary', enable: true,display:true, description: "查看今日单词进行学习" ,component: DailyVocabularyComponent,hasBackButton:true,hasNextButton:true},
+  { name: "故事大王", route: 'memoryGame', enable: true, display:true, description: "ai根据今日单词生成故事" ,component: MemoryMasterComponent,hasBackButton:true,hasNextButton:false},
+  {name:"今日对话",route:"todayDialog",enable:true,display:true,description:"与超自然ai对话",component:TodayDialogComponent,hasBackButton:false,hasNextButton:false},
+  { name: "单词消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分" ,component: WordMatchingGameComponent ,hasBackButton:true,hasNextButton:false},
+  { name: "单词本", route: 'vocabularyBook', enable: true,display:true, description: "查看单词本" ,component: VocabularyBookComponent,hasBackButton:true,hasNextButton:false},
   { name: "错题本", route: 'errorBook', enable: false, display:true, description: "敬请期待" ,component: null},
 ]
 
@@ -98,9 +101,13 @@ export function AppRouter() {
       const PageComponent = currentPage.component
       return (
         <div className="relative">
+          {currentPage.hasBackButton && 
           <BackButton page={pages[0]} navigateTo={navigateTo} />
+          }
           <PageComponent navigateTo={navigateTo} />
+          {currentPage.hasNextButton && 
           <NextButton page={pages.indexOf(currentPage) == pages.length - 1 ? currentPage: pages[pages.indexOf(currentPage)+1] } navigateTo={navigateTo} />
+          }
         </div>
       )
     } else {

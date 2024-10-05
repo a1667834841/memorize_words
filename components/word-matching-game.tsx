@@ -287,7 +287,7 @@ export function WordMatchingGameComponent(props:WordButtonProps) {
                   initial={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}
                   whileHover={{ boxShadow: "0px 6px 12px rgba(0, 0, 0, 0.15)" }}
                 >
-                  {word.chinese}
+                  {word.type}: {word.chinese.split(/[；,，;]/, 1)[0]}
                 </ButtonWrapper>
               </motion.div>
             ))}
