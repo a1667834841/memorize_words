@@ -74,7 +74,7 @@ async function getPhrasesMap(rawWords: any) {
       },
     },
   });
-  console.log(phrases)
+  // console.log(phrases)
   // phrases转map
   const phrasesMap = new Map<string, Phrase[]>();
   phrases.forEach((phrase) => {
