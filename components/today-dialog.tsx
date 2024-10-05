@@ -3,8 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Mic, Send } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
-import { useMediaQuery } from '@/hooks/use-media-query';
-import { DailyVocabularyComponent } from './daily-vocabulary';
+import { isMobileDevice } from '@/hooks/use-media-query';
 import { Word } from '@/types/words';
 import { globalCache } from './app-router';
 
@@ -21,8 +20,8 @@ const TodayDialogComponent: React.FC = () => {
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(!isDesktop);
+
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(isMobileDevice());
   const [words, setWords] = useState<Word[]>([])
   const [currentAiMessage, setCurrentAiMessage] = useState('');
 
@@ -44,6 +43,10 @@ const TodayDialogComponent: React.FC = () => {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    setIsLeftPanelCollapsed(isMobileDevice());
+  }, []);
 
   useEffect(() => {
     if (currentAiMessage) {
@@ -122,7 +125,7 @@ const TodayDialogComponent: React.FC = () => {
     <div className="h-full p-4 bg-gray-100">
       <h2 className="text-lg font-bold mb-4">今日单词</h2>
       {!isLeftPanelCollapsed && words.map((word, index) => (
-        <div key={index} className="mb-2">
+        <div key={index} className="mb-2 sm:text-sm text-xs">
           <span className="font-bold text-gray-800">{word.english}</span> - <span className="text-gray-600">{word.chinese}</span>
         </div>
       ))}
@@ -133,13 +136,13 @@ const TodayDialogComponent: React.FC = () => {
     <ResizablePanelGroup direction="horizontal" className="h-full ">
       <ResizablePanel
         defaultSize={25}
-        collapsible={true}
+        collapsible={isLeftPanelCollapsed}
         collapsedSize={5}
         minSize={20}
         maxSize={40}
         onCollapse={() => setIsLeftPanelCollapsed(true)}
         onExpand={() => setIsLeftPanelCollapsed(false)}
-        className={ 'bg-gray-100 ' + (isLeftPanelCollapsed ? "min-w-[50px]" : "")}
+        className={ 'bg-gray-100 sm:max-[0px] md:max-[0px] ' + (isLeftPanelCollapsed ? "max-w-[0px]" : "")}
       >
         <div className="h-full mt-[20%] p-4">
           {!isLeftPanelCollapsed && leftPanelContent}
@@ -150,10 +153,10 @@ const TodayDialogComponent: React.FC = () => {
         <div className="flex flex-col h-full">
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto mt-10 p-4 space-y-4">
             <div className="flex flex-col justify-center items-left h-[80vh]">
-              <div className="w-full  h-full p-10 overflow-y-auto">
+              <div className="w-full  h-full p-5 overflow-y-auto">
                 {messages.map((message, index) => (
                   <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-                    <div className={`max-w-[70%] p-3 items-right rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+                    <div className={`max-w-[90%] p-3 items-right rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
                       {message.parts[0].text}
                     </div>
                   </div>

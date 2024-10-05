@@ -5,9 +5,18 @@ import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import Link from 'next/link'
 import Confetti from 'react-confetti'
-import { globalCache, saveCache } from '@/components/app-router'
+import { globalCache, Page, saveCache,pages } from '@/components/app-router'
 import { Word } from '@/types/words'
-export function WordMatchingGameComponent() {
+
+const ButtonWrapper = motion(Button)
+
+interface WordButtonProps {
+  page:Page
+  navigateTo: (page: Page) => void;
+}
+
+
+export function WordMatchingGameComponent(props:WordButtonProps) {
   const [words, setWords] = useState<Word[]>([])
   const [gameWords, setGameWords] = useState<Word[]>([])
   const [displayWords, setDisplayWords] = useState<{english: Word[], chinese: Word[]}>({ english: [], chinese: [] })
@@ -59,9 +68,9 @@ export function WordMatchingGameComponent() {
   useEffect(() => {
     // 只有在游戏开始后才开始倒计时
     if (gameStarted && timeLeft > 0 && !gameOver) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
+      const timer = setTimeout(() => setTimeLeft(prevTime => Number((prevTime - 0.01).toFixed(2))), 10)
       return () => clearTimeout(timer)
-    } else if (timeLeft === 0 && !gameOver) {
+    } else if (timeLeft <= 0 && !gameOver) {
       endGame(false)
     }
   }, [timeLeft, gameOver, gameStarted])
@@ -71,6 +80,10 @@ export function WordMatchingGameComponent() {
     if (completed) {
       setShowConfetti(true)
     }
+  }
+
+  const goBack = () => {
+    props.navigateTo(pages[0])
   }
 
   useEffect(() => {
@@ -121,21 +134,31 @@ export function WordMatchingGameComponent() {
         }
         setMisMatchedWords(prevMisMatchedWords => wrongWord? [...prevMisMatchedWords, wrongWord] : prevMisMatchedWords)
 
-        // 为了只显示一次且时间为0.5秒的错误提示，这里使用setTimeout
-        setTimeout(() => {
-          setMismatchedPair(null)
-          setSelectedEnglish(null)
-          setSelectedChinese(null)
-        }, 500)
       }
+
+      // 为了只显示一次且时间为0.5秒的错误提示，这里使用setTimeout
+      setTimeout(() => {
+        setSelectedEnglish(null)
+        setSelectedChinese(null)
+      }, 500)
     }
   }, [selectedEnglish, selectedChinese, gameWords])
+
+  useEffect(() => {
+    if (mismatchedPair) {
+      setTimeout(() => {
+        setMismatchedPair(null)
+        setSelectedEnglish(null)
+        setSelectedChinese(null)
+      }, 500)
+    }
+  }, [mismatchedPair])
 
   const restartGame = () => {
     const shuffled = [...words].sort(() => 0.5 - Math.random())
     setGameWords(shuffled.slice(0, 60))
     setScore(0)
-    setTimeLeft(30)
+    setTimeLeft(30.00)
     setGameOver(false)
     setSelectedEnglish(null)
     setSelectedChinese(null)
@@ -160,21 +183,21 @@ export function WordMatchingGameComponent() {
   return (
     <div className="container mx-auto p-4">
       {showConfetti && <Confetti />}
-      <h1 className="text-3xl font-bold text-center mb-4">单词匹配游戏</h1>
+      <h1 className="text-3xl font-bold text-center mb-4 mt-10">单词匹配游戏</h1>
       <div className="flex justify-between mb-4">
         <div className="text-xl">得分: {score}</div>
-        <div className='text-xl'>单词错误数: {misMatchedWords.length}</div>
-        <div className="text-xl">时间: {timeLeft}s</div>
+        {/* <div className='text-xl'>单词错误数: {misMatchedWords.length}</div> */}
+        <div className="text-xl">时间: 
+          <span className={`${timeLeft < 10 ? 'text-red-500' : ''} w-16 inline-block text-center`}>{timeLeft}</span>s
+        </div>
       </div>
       {!gameStarted ? (
         <div className="text-center">
           <Button onClick={startGame}>开始游戏</Button>
-          <div className="flex justify-center mb-4 mt-4">
-            <div className="text-center border border-gray-300 rounded-lg p-4 max-w-[50%]">
-              <p className="text-gray-500 text-left">
-                游戏说明：点击"开始游戏"后，你将有60秒的时间来匹配英文单词和中文释义。
-                选择一个英文单词和一个中文释义，如果匹配正确，它们将消失并得分。
-                尽可能在时间内匹配更多单词！祝你好运吧！
+          <div className="flex justify-center mb-4 mt-4 w-full">
+            <div className="text-center border border-gray-300 rounded-lg p-4 ">
+              <p className="text-gray-500 text-left ">
+                游戏说明：点击"开始游戏"后，你将有60秒的时间来匹配英文单词和中文释义。选择一个英文单词和一个中文释义，如果匹配正确，它们将消失并得分。尽可能在时间内匹配更多单词！祝你好运吧！
               </p>
             </div>
           </div>
@@ -190,6 +213,7 @@ export function WordMatchingGameComponent() {
             <Button asChild>
               <Link href="/" onClick={(e) => {
                 e.preventDefault();
+                goBack()
               }}>
                 返回首页
               </Link>
@@ -207,7 +231,7 @@ export function WordMatchingGameComponent() {
                   opacity: fadingOutWords.some(w => w.english === word.english) ? 0 : 1,
                   scale: fadingOutWords.some(w => w.english === word.english) ? 0.8 : 1,
                 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.2 }}
                 onAnimationComplete={() => {
                   if (fadingOutWords.some(w => w.english === word.english)) {
                     hideWord(word)
@@ -215,18 +239,21 @@ export function WordMatchingGameComponent() {
                 }}
                 style={{ visibility: hiddenWords.some(w => w.english === word.english) ? 'hidden' : 'visible' }}
               >
-                <Button
+                <ButtonWrapper
                   onClick={(e) => {
                     e.preventDefault()
                     handleSelect('english', word.english)
                   }}
-                  className={`w-full hover:bg-blue-500 mb-4 py-6 ${
+                  className={`w-full mb-4 py-6 transition-all duration-150 ${
                     selectedEnglish === word.english ? 'bg-blue-600 hover:bg-blue-400' : ''
                   } ${matchedPair?.english === word.english ? 'bg-green-600' : ''}
                     ${mismatchedPair?.english === word.english ? 'bg-red-400 hover:bg-red-400' : ''}`}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}
+                  whileHover={{ boxShadow: "0px 6px 12px rgba(0, 0, 0, 0.15)" }}
                 >
                   {word.english}
-                </Button>
+                </ButtonWrapper>
               </motion.div>
             ))}
           </div>
@@ -247,18 +274,21 @@ export function WordMatchingGameComponent() {
                 }}
                 style={{ visibility: hiddenWords.some(w => w.chinese === word.chinese) ? 'hidden' : 'visible' }}
               >
-                <Button
+                <ButtonWrapper
                   onClick={(e) => {
                     e.preventDefault()
                     handleSelect('chinese', word.chinese)
                   }}
-                  className={`w-full hover:bg-blue-500 mb-4 py-6 ${
+                  className={`w-full mb-4 py-6 transition-all duration-150 ${
                     selectedChinese === word.chinese ? 'bg-blue-500 hover:bg-blue-600' : ''
                   } ${matchedPair?.chinese === word.chinese ? 'bg-green-500 hover:bg-green-600' : ''}
                     ${mismatchedPair?.chinese === word.chinese ? 'bg-red-400 hover:bg-red-400' : ''}`}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}
+                  whileHover={{ boxShadow: "0px 6px 12px rgba(0, 0, 0, 0.15)" }}
                 >
                   {word.chinese}
-                </Button>
+                </ButtonWrapper>
               </motion.div>
             ))}
           </div>
