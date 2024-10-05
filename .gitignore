@@ -27,6 +27,8 @@ yarn-error.log*
 
 # local env files
 .env*.local
+# 忽略.env文件
+.env
 
 # vercel
 .vercel
