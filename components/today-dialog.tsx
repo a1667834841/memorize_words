@@ -12,9 +12,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 interface Message {
   role: string;
   parts: Part[];
+  requestTime?: number;
+  responseTime?: number;
+  audioRequestTime?: number;
+  audioResponseTime?: number;
 }
 interface Part {
   text: string;
+  words?: string[];
 }
 
 interface TodayDialogProps {
@@ -36,14 +41,30 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   const [audioCache, setAudioCache] = useState<{[key: string]: string}>({});
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState<number | null>(null);
+  const [requestTime, setRequestTime] = useState(0);
+
+  const isMounted = useRef(true);
 
   useEffect(() => {
-    setMessages([{ role: 'model', parts: [{ text: '你好！今天想聊些什么呢？' }] }]);
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     
     fetch('/api/daily-words')
     .then(response => response.json())
     .then((data: Word[]) => {
       setWords(data);
+      setMessages([{ 
+        role: 'model', 
+        parts: [{ 
+          text: `你好呀！我是你的今天的英语老师！今天咱们学了以下单词，有12个单词诶！那你想从哪个单词开始聊起呢？`,
+          words: data.map(word => word.english)
+        }] 
+      }]);
     })
     .catch(error => {
       console.error('获取单词时出错:', error)
@@ -54,7 +75,13 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [messages, currentAiMessage]);
+  }, [messages]);
+
+  useEffect(() => {
+    if (messages.length > 1 && isWaiting ) {
+      messageSend(messages);
+    }
+  }, [isWaiting]);
 
   useEffect(() => {
     setIsLeftPanelCollapsed(isMobileDevice());
@@ -65,17 +92,21 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
     if (currentAiMessage) {
         setMessages(prevMessages => {
+          const endResponseTime = Date.now();
           const lastMessage = prevMessages[prevMessages.length - 1];
           if (lastMessage.role === 'user') {
-              return [...prevMessages, { role: 'model', parts: [{ text: currentAiMessage.replace('@stop@', '') }] }];
+              return [...prevMessages, { role: 'model', parts: [{ text: currentAiMessage.replace('@stop@', '') }],requestTime }];
           } else if (lastMessage.role === 'model' && lastMessage.parts[0].text !== currentAiMessage) {
-              return [...prevMessages.slice(0, -1), { role: 'model', parts: [{ text: currentAiMessage.replace('@stop@', '') }] }];
+              return [...prevMessages.slice(0, -1), { role: 'model', parts: [{ text: currentAiMessage.replace('@stop@', '') }] ,requestTime}];
           } else {
               return prevMessages;
           }
       });
     }
   
+    if (!textToSpeechEnabled) {
+      stopAudioPlayback();
+    }
 
     
     // console.log('currentAiMessage', currentAiMessage,"isStop", isStop)
@@ -83,7 +114,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
       // 移除结束符，和表情符合
       const emojiRegex = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]/g;
       const cleanedText = currentAiMessage.replace('@stop@', '').replace(emojiRegex, '');
-      textToSpeech(cleanedText);
+      textToSpeech(cleanedText, messages.length - 1);
     }
 
     if (isStop) {
@@ -91,10 +122,12 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     }
   }, [currentAiMessage, textToSpeechEnabled]);
 
-  const textToSpeech = async (text: string) => {
-    if (playingAudio === text) return; // 如果正在播放，则不做任何操作
+  const textToSpeech = async (text: string, messageIndex: number) => {
+    if (playingAudio === text) return;
     setPlayingAudio(text);
+    setCurrentMessageIndex(messageIndex);
     try {
+      const audioStartTime = Date.now();
       let audioUrl: string;
       if (audioCache[text]) {
         audioUrl = audioCache[text];
@@ -115,32 +148,54 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
         audioUrl = URL.createObjectURL(audioBlob);
         setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
       }
+      const audioEndTime = Date.now();
+      
+      setMessages(prevMessages => prevMessages.map((msg, index) => 
+        index === messageIndex
+          ? { ...msg, audioRequestTime: audioEndTime - audioStartTime, audioResponseTime: Date.now() - audioEndTime }
+          : msg
+      ));
       
       const audio = new Audio(audioUrl);
-      audio.onended = () => setPlayingAudio(null);
+      audio.onended = () => {
+        setPlayingAudio(null);
+        setCurrentMessageIndex(null);
+      };
       audio.play();
     } catch (error) {
       console.error('文本转语音出错:', error);
       setPlayingAudio(null);
+      setCurrentMessageIndex(null);
     }
   };
 
-  const handleSend = async () => {
-    if (input.trim()) {
-      const newUserMessage = { role: 'user', parts: [{ text: input }] };
-      setMessages(prevMessages => [...prevMessages, newUserMessage]);
-      setInput('');
-      setCurrentAiMessage('');
-      setIsWaiting(true);
+  const messageSend = async (messages: Message[]) => {
+  
+      const startTime = Date.now();
+
+      const learnSituations = words.map(word => {
+        return {
+          word: word.english,
+          mentionedTimes: word.hitCount
+        }
+      })
+
+      // clone messages
+      let realMessages = JSON.parse(JSON.stringify(messages))
+      // 将第一条的message的text添加上learnSituations
+      realMessages[0].parts[0].text += `今天咱们学了以下单词，有12个单词诶！那你想从哪个单词开始聊起呢？learnSituations:`+JSON.stringify(learnSituations)
 
       try {
-        const response = await fetch('/api/gemini-chat', {
+        const response = await fetch('/api/openai-chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ messages: [...messages, newUserMessage] }),
+          body: JSON.stringify({ messages: realMessages }),
         });
+
+        const endRequestTime = Date.now();
+        setRequestTime(endRequestTime - startTime);
 
         if (!response.ok) {
           throw new Error('API 请求失败');
@@ -148,26 +203,51 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
+        let buffer = '';
 
         while (true) {
           const { done, value } = await reader?.read() ?? { done: true, value: undefined };
-          // console.log('done', done, 'value', value)
           if (done) {
-            setCurrentAiMessage(prev => prev + '@stop@')
+            if (buffer) {
+              setCurrentAiMessage(prev => prev + buffer);
+            }
+            setCurrentAiMessage(prev => prev + '@stop@');
+           
             break;
-          } 
-          const chunk = decoder.decode(value);
-          setCurrentAiMessage(prev => prev + chunk);
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+
+          while (buffer.length > 0) {
+            const char = buffer[0];
+            buffer = buffer.slice(1);
+
+            setCurrentAiMessage(prev => prev + char);
+            await new Promise(resolve => setTimeout(resolve, 20));
+          }
+
+          if (isWaiting) {
+            setIsWaiting(false);
+          }
         }
       } catch (error) {
         console.error('发送消息时出错:', error);
-        setMessages(prevMessages => [
-          ...prevMessages,
-          { role: 'model', parts: [{ text: '抱歉，我遇到了一些问题。请稍后再试。' }] }
-        ]);
+        setCurrentAiMessage('抱歉，我遇到了一些问题。请稍后再试。');
       } finally {
         setIsWaiting(false);
+
       }
+    
+  }
+
+  const handleSend = async () => {
+    if (input.trim()) {
+      const newUserMessage = { role: 'user', parts: [{ text: input }] };
+      setInput('');
+      setCurrentAiMessage('');
+      setIsWaiting(true);
+      setMessages(prevMessages => [...prevMessages, newUserMessage]);
+     
     }
   };
 
@@ -215,6 +295,16 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     }
   }, [scrollToBottom]);
 
+  const stopAudioPlayback = () => {
+    if (playingAudio) {
+      const audio = new Audio(audioCache[playingAudio]);
+      audio.pause();
+      audio.currentTime = 0;
+      setPlayingAudio(null);
+      setCurrentMessageIndex(null);
+    }
+  };
+
   return (
     <ResizablePanelGroup direction="horizontal" className=" ">
       <ResizablePanel
@@ -239,19 +329,26 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
               <div className="w-full h-full p-5 overflow-y-auto">
                 {messages.map((message, index) => (
                   <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-                    <div className="flex ">
-                      <div className={` p-3 items-right rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+                    <div className="flex flex-col max-w-[70%]">
+                      <div className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
                         {message.parts[0].text}
+                        {message.parts[0].words && (
+                          <div>
+                            {message.parts[0].words.map((word, i) => (
+                              <Button size={"sm"} variant={"outline"} className="m-1" key={i}>{word}</Button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       {message.role === 'model' && (
-                        <div className="flex flex-col mt-1 space-y-2">
+                        <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
                           <div className="flex space-x-2">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button 
-                                    className={`text-gray-500 hover:text-gray-700 ${playingAudio === message.parts[0].text ? 'animate-pulse-fast' : ''}`}
-                                    onClick={() => textToSpeech(message.parts[0].text)}
+                                    className={`${playingAudio === message.parts[0].text ? 'animate-pulse-fast' : ''}`}
+                                    onClick={() => textToSpeech(message.parts[0].text, index)}
                                     disabled={playingAudio !== null}
                                   >
                                     <Volume2 size={16} />
@@ -266,7 +363,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button 
-                                    className="text-gray-500 hover:text-gray-700"
                                     onClick={() => handleCopy(message.parts[0].text)}
                                   >
                                     {copiedText === message.parts[0].text ? (
@@ -282,7 +378,20 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                               </Tooltip>
                             </TooltipProvider>
                           </div>
-                        
+                          <div className="flex flex-col space-y-1 text-right">
+                            {message.requestTime !== undefined && (
+                              <span>请求: {message.requestTime / 1000}秒</span>
+                            )}
+                            {message.responseTime !== undefined && (
+                              <span>响应: {message.responseTime / 1000}秒</span>
+                            )}
+                            {message.audioRequestTime !== undefined && (
+                              <span>音频请求: {message.audioRequestTime / 1000}秒</span>
+                            )}
+                            {message.audioResponseTime !== undefined && (
+                              <span>音频响应: {message.audioResponseTime / 1000}秒</span>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -306,7 +415,12 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
               <Switch
                 id="text-to-speech"
                 checked={textToSpeechEnabled}
-                onCheckedChange={setTextToSpeechEnabled}
+                onCheckedChange={(checked) => {
+                  setTextToSpeechEnabled(checked);
+                  if (!checked) {
+                    stopAudioPlayback();
+                  }
+                }}
               />
               <label htmlFor="text-to-speech" className="ml-2 text-sm">
                 文字转语音

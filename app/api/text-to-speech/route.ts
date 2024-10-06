@@ -79,10 +79,10 @@ export async function POST(request: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         // 先处理第一句
-        console.log('处理第一句');
+        console.log('处理第一句：', sentences[0].trim());
         let startTime = Date.now();
         const firstSentenceAudio = await getAudioForSentence(sentences[0].trim(), voice, accessToken);
-        const endTime = Date.now();
+        let endTime = Date.now();
         console.log(`处理第一句用时: ${endTime - startTime}ms`);
         controller.enqueue(new Uint8Array(firstSentenceAudio));
 
@@ -99,6 +99,8 @@ export async function POST(request: Request) {
           mergedBuffer.set(new Uint8Array(buffer), offset);
           offset += buffer.byteLength;
         }
+        endTime = Date.now();
+        console.log(`处理剩余句子用时: ${endTime - startTime}ms`);
 
         controller.enqueue(mergedBuffer);
         controller.close();
