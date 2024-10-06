@@ -2,7 +2,7 @@ import { StreamingTextResponse } from 'ai'
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@fuyun/generative-ai'
 import { chatPromptTemplate } from '@/app/utils/promptTemplates'
 
-const baseUrl = 'https://gemini.baipiao.io'
+const baseUrl = process.env.GEMINI_API_URL || ''
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function POST(request: Request) {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     return new Response('API key is not configured', { status: 500 })
   }
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' ,safetySettings},{baseUrl})
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' ,safetySettings},{baseUrl})
     const result = await model.generateContentStream({
         contents: messages,
         systemInstruction: chatPromptTemplate(),

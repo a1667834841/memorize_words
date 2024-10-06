@@ -2,7 +2,7 @@ import { StreamingTextResponse } from 'ai'
 import { GoogleGenerativeAI } from '@fuyun/generative-ai'
 import { prefixPromptTemplate } from '@/app/utils/promptTemplates'
 
-const baseUrl = 'https://gemini.baipiao.io'
+const baseUrl = process.env.GEMINI_API_URL || ''
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function POST(request: Request) {
