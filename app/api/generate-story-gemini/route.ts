@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' },{baseUrl})
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.0-pro' },{baseUrl})
     const result = await model.generateContentStream({
         contents: [
           { role: 'model', parts: [{ text:  prefixPromptTemplate()}] },

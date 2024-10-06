@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     return new Response('API key is not configured', { status: 500 })
   }
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' ,safetySettings},{baseUrl})
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' ,safetySettings},{baseUrl})
     const result = await model.generateContentStream({
         contents: messages,
         systemInstruction: chatPromptTemplate(),
