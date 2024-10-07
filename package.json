@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "wws": "ts-node --project tsconfig.server.json server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production ts-node --project tsconfig.server.json server.ts",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
@@ -29,6 +30,7 @@
     "framer-motion": "^11.9.0",
     "langchain": "^0.3.2",
     "lucide-react": "^0.446.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.40.0",
     "next": "14.2.13",
     "prisma": "^5.20.0",
     "react": "^18",
@@ -39,12 +41,14 @@
     "socket.io": "^4.8.0",
     "socket.io-client": "^4.8.0",
     "tailwind-merge": "^2.5.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/ws": "^8.5.12",
     "eslint": "^8",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",

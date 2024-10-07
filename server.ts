@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { Server as SocketIOServer } from "socket.io";
+import { setupSpeechRecognition } from './app/utils/speechRecognition';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -13,19 +14,27 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
-  const io = new SocketIOServer(server);
+  const io = new SocketIOServer(server, {
+    path: '/api/socketio',
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST']
+    }
+  });
 
   io.on('connection', (socket) => {
-    console.log('A client connected');
-
-    socket.on('chat message', (msg: string) => {
-      console.log('Message received:', msg);
-      io.emit('chat message', msg);
-    });
+    console.log('Socket.IO 连接已建立');
+    setupSpeechRecognition(socket);
 
     socket.on('disconnect', () => {
-      console.log('A client disconnected');
+      console.log('Socket.IO 连接已关闭');
     });
+
+    socket.on('error', (error) => {
+      console.log('Socket.IO 错误:', error);
+    });
+
+
   });
 
   server.listen(3000, (err?: Error) => {

@@ -26,9 +26,11 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const response = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         stream: true,
         messages: realMessages,
+        // 设置温度
+        temperature: 1,
       });
 
       for await (const chunk of response) {

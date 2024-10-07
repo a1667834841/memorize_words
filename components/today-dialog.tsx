@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Mic, Send, Volume2, Copy, Check } from 'lucide-react';
+import { Phone, Send, Volume2, Copy, Check, PhoneOff } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 import { isMobileDevice } from '@/hooks/use-media-query';
-import { Word } from '@/types/words';
+import { Word } from '@/lib/types/words';
 import { globalCache, Page,pages } from './app-router';
 import { Switch } from './ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import {  audioToWav, saveAudioToFile } from '@/app/utils/audio';
+import { useWebSocket } from '@/hooks/use-websocket';
+import { ResultReason } from 'microsoft-cognitiveservices-speech-sdk';
+import * as speechsdk from 'microsoft-cognitiveservices-speech-sdk';
+import { getSpeechToken } from '@/hooks/use-websocket';
 
 interface Message {
   role: string;
@@ -43,6 +48,15 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [currentMessageIndex, setCurrentMessageIndex] = useState<number | null>(null);
   const [requestTime, setRequestTime] = useState(0);
+  const [audioQueue, setAudioQueue] = useState<Blob[]>([]);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [sourceNode, setSourceNode] = useState<AudioBufferSourceNode | null>(null);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [userCurrentMessage,setUserCurrentMessage] = useState('')
 
   const isMounted = useRef(true);
 
@@ -108,15 +122,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
       stopAudioPlayback();
     }
 
-    
-    // console.log('currentAiMessage', currentAiMessage,"isStop", isStop)
-    if (textToSpeechEnabled && !isPlaying && isStop) {
-      // 移除结束符，和表情符合
-      const emojiRegex = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]/g;
-      const cleanedText = currentAiMessage.replace('@stop@', '').replace(emojiRegex, '');
-      textToSpeech(cleanedText, messages.length - 1);
-    }
-
     if (isStop) {
       setIsWaiting(false);
     }
@@ -124,13 +129,17 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
   const textToSpeech = async (text: string, messageIndex: number) => {
     if (playingAudio === text) return;
+    if (!textToSpeechEnabled || isPlaying) return;
+    
+    const emojiRegex = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]/g;
+    text = text.replace('@stop@', '').replace(emojiRegex, '');
     setPlayingAudio(text);
     setCurrentMessageIndex(messageIndex);
+
     try {
       const audioStartTime = Date.now();
-      let audioUrl: string;
       if (audioCache[text]) {
-        audioUrl = audioCache[text];
+        playAudio(audioCache[text], messageIndex);
       } else {
         const response = await fetch('/api/text-to-speech', {
           method: 'POST',
@@ -144,9 +153,32 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           throw new Error('文本转语音请求失败');
         }
 
-        const audioBlob = await response.blob();
-        audioUrl = URL.createObjectURL(audioBlob);
-        setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
+        const reader = response.body?.getReader();
+        const ctx = new AudioContext();
+        setAudioContext(ctx);
+
+        const streamAudio = async () => {
+          const chunks: Uint8Array[] = [];
+          while (true) {
+            const { done, value } = await reader?.read() ?? { done: true, value: undefined };
+            if (done) break;
+            chunks.push(value);
+            
+            const audioBuffer = await ctx.decodeAudioData(value.buffer);
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(ctx.destination);
+            setSourceNode(source);
+            source.start();
+            
+            await new Promise(resolve => source.onended = resolve);
+          }
+          const fullAudio = new Blob(chunks, { type: 'audio/mpeg' });
+          const audioUrl = URL.createObjectURL(fullAudio);
+          setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
+        };
+
+        await streamAudio();
       }
       const audioEndTime = Date.now();
       
@@ -155,18 +187,55 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           ? { ...msg, audioRequestTime: audioEndTime - audioStartTime, audioResponseTime: Date.now() - audioEndTime }
           : msg
       ));
-      
-      const audio = new Audio(audioUrl);
-      audio.onended = () => {
-        setPlayingAudio(null);
-        setCurrentMessageIndex(null);
-      };
-      audio.play();
     } catch (error) {
       console.error('文本转语音出错:', error);
       setPlayingAudio(null);
       setCurrentMessageIndex(null);
     }
+  };
+
+  async function sttFromMic() {
+    const speechToken = await getSpeechToken()
+    if (speechToken?.token && speechToken?.region) {
+      const speechConfig = speechsdk.SpeechConfig.fromAuthorizationToken(speechToken.token, speechToken.region);
+      speechConfig.speechRecognitionLanguage = 'zh-CN';
+      
+      const audioConfig = speechsdk.AudioConfig.fromDefaultMicrophoneInput();
+      const recognizer = new speechsdk.SpeechRecognizer(speechConfig, audioConfig);
+
+
+      recognizer.recognizeOnceAsync(result => {
+          
+          if (result.reason === ResultReason.RecognizedSpeech) {
+              setUserCurrentMessage(result.text)
+              setInput(result.text)
+              setIsCallActive(false)
+              handleSend()
+          } else {
+            setUserCurrentMessage(result.text);
+            setInput('')
+            setIsCallActive(false)
+          }
+      });
+    } else {
+      console.error('语音令牌或区域未定义');
+      // 在这里处理错误情况
+    }
+  }
+
+
+  const playAudio = (url: string, messageIndex: number): Promise<void> => {
+    return new Promise((resolve) => {
+      const audio = new Audio(url);
+      audio.onended = () => {
+        setIsAudioPlaying(false);
+        setPlayingAudio(null);
+        setCurrentMessageIndex(null);
+        URL.revokeObjectURL(url); // 释放 URL 对象
+        resolve();
+      };
+      audio.play();
+    });
   };
 
   const messageSend = async (messages: Message[]) => {
@@ -183,7 +252,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
       // clone messages
       let realMessages = JSON.parse(JSON.stringify(messages))
       // 将第一条的message的text添加上learnSituations
-      realMessages[0].parts[0].text += `今天咱们学了以下单词，有12个单词诶！那你想从哪个单词开始聊起呢？learnSituations:`+JSON.stringify(learnSituations)
+      realMessages[0].parts[0].text += `今天咱们学了以下单词，有12个单词！那你想从哪个单词开始聊起呢？learnSituations:`+JSON.stringify(learnSituations)
 
       try {
         const response = await fetch('/api/openai-chat', {
@@ -205,39 +274,43 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader?.read() ?? { done: true, value: undefined };
-          if (done) {
-            if (buffer) {
-              setCurrentAiMessage(prev => prev + buffer);
+        let fullMessage = '';
+        let isDataReceived = false;
+
+        // 接收数据
+        try {
+          while (true) {
+            const { done, value } = await reader?.read() ?? { done: true, value: undefined };
+            if (done) {
+              isDataReceived = true;
+              break;
             }
-            setCurrentAiMessage(prev => prev + '@stop@');
-           
-            break;
+            fullMessage += decoder.decode(value, { stream: true });
           }
+        } catch (error) {
+          console.error('接收消息时出错:', error);
+          setCurrentAiMessage('抱歉，我遇到了一些问题。请稍后再试。');
+          setIsWaiting(false);
+          return;
+        }
 
-          buffer += decoder.decode(value, { stream: true });
-
-          while (buffer.length > 0) {
-            const char = buffer[0];
-            buffer = buffer.slice(1);
-
-            setCurrentAiMessage(prev => prev + char);
+        // 实现打字机效果
+        if (isDataReceived) {
+          // 开始播放音频
+          textToSpeech(fullMessage  , messages.length - 1);
+          for (let i = 0; i < fullMessage.length; i++) {
+            setCurrentAiMessage(prev => prev + fullMessage[i]);
             await new Promise(resolve => setTimeout(resolve, 20));
           }
-
-          if (isWaiting) {
-            setIsWaiting(false);
-          }
+          setCurrentAiMessage(prev => prev + '@stop@');
         }
-      } catch (error) {
-        console.error('发送消息时出错:', error);
-        setCurrentAiMessage('抱歉，我遇到了一些问题。请稍后再试。');
-      } finally {
-        setIsWaiting(false);
 
+        setIsWaiting(false);
       }
-    
+     catch (error) {
+      console.error('发送消息时出错:', error);
+      setCurrentAiMessage('抱歉，我遇到了一些问题。请稍后再试。');
+    }
   }
 
   const handleSend = async () => {
@@ -296,17 +369,106 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   }, [scrollToBottom]);
 
   const stopAudioPlayback = () => {
-    if (playingAudio) {
-      const audio = new Audio(audioCache[playingAudio]);
-      audio.pause();
-      audio.currentTime = 0;
-      setPlayingAudio(null);
-      setCurrentMessageIndex(null);
+    if (sourceNode) {
+      sourceNode.stop();
+      setSourceNode(null);
     }
+    if (audioContext) {
+      audioContext.close();
+      setAudioContext(null);
+    }
+    setPlayingAudio(null);
+    setCurrentMessageIndex(null);
   };
 
+
+
+  const startRecording = async () => {
+    sttFromMic()
+    // try {
+    //   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    //   const recorder = new MediaRecorder(stream);
+    //   setMediaRecorder(recorder);
+
+    //   recorder.ondataavailable = (event) => {
+    //     if (event.data.size > 0 && isConnected) {
+    //       event.data.arrayBuffer().then((arrayBuffer) => {
+    //         console.log("客户端发送 arrayBuffer type:",typeof arrayBuffer)
+
+    //         sendMessage(arrayBuffer);
+    //       });
+    //     }
+    //   };
+
+    //   recorder.start(100); // 每100ms发送一次数据
+      setIsCallActive(true);
+    // } catch (error) {
+    //   console.error('无法访问麦克风:', error);
+    // }
+  };
+
+  const stopRecording = () => {
+    setIsCallActive(false);
+    // if (mediaRecorder) {
+    //   mediaRecorder.stop();
+    //   setIsCallActive(false);
+    //   if (isConnected) {
+    //     sendMessage('END_OF_STREAM');
+    //   }
+    // }
+  };
+
+  // useEffect(() => {
+  //   if (lastMessage) {
+  //     const { text } = lastMessage;
+  //     if (text) {
+  //       setInput(text);
+  //       handleSend();
+  //     }
+  //   }
+  // }, [lastMessage]);
+
+  const handleCallStart = () => {
+    startRecording();
+  };
+
+  const handleCallEnd = () => {
+    stopRecording();
+  };
+
+  // 模拟音频级别变化
+  useEffect(() => {
+    if (isCallActive && mediaRecorder) {
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(mediaRecorder.stream);
+      microphone.connect(analyser);
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const updateAudioLevel = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((acc, val) => acc + val, 0) / bufferLength;
+        setAudioLevel(average / 128);  // 归一化到0-1范围
+        if (isCallActive) {
+          requestAnimationFrame(updateAudioLevel);
+        }
+      };
+
+      updateAudioLevel();
+
+      return () => {
+        microphone.disconnect();
+        audioContext.close();
+      };
+    }
+  }, [isCallActive, mediaRecorder]);
+
+
+
   return (
-    <ResizablePanelGroup direction="horizontal" className=" ">
+    <ResizablePanelGroup direction="horizontal" className="relative">
       <ResizablePanel
         defaultSize={25}
         collapsible={isLeftPanelCollapsed}
@@ -429,7 +591,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setMessages([]);
+                  setMessages(messages.slice(0, 1));
                   setInput('');
                 }}
                 className="ml-auto "
@@ -452,12 +614,9 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
               <Button
                 variant="outline"
                 size="icon"
-                onMouseDown={handleVoiceRecord}
-                onMouseUp={handleVoiceStop}
-                onTouchStart={handleVoiceRecord}
-                onTouchEnd={handleVoiceStop}
+                onClick={handleCallStart}
               >
-                <Mic className={isRecording ? 'text-red-500' : ''} />
+                <Phone className={isCallActive ? 'text-green-500' : ''} />
               </Button>
               <Input
                 value={input}
@@ -474,6 +633,29 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           </div>
         </div>
       </ResizablePanel>
+
+      {isCallActive && (
+        <div className="absolute inset-0 bg-gray-500 bg-opacity-50 flex flex-col items-center justify-center">
+          <div className="w-64 h-32 bg-white rounded-lg flex items-center justify-center">
+            <svg width="200" height="60" viewBox="0 0 200 60">
+              <path
+                d={`M 0 30 Q 50 ${30 - audioLevel * 20} 100 30 Q 150 ${30 + audioLevel * 20} 200 30`}
+                fill="none"
+                stroke="blue"
+                strokeWidth="2"
+              />
+            </svg>
+          </div>
+          <Button
+            variant="destructive"
+            size="lg"
+            className="mt-4"
+            onClick={handleCallEnd}
+          >
+            <PhoneOff />
+          </Button>
+        </div>
+      )}
     </ResizablePanelGroup>
   );
 };

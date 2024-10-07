@@ -10,8 +10,11 @@ interface Voice {
 const XiaoxiaoNeural: Voice = {
     name: 'zh-CN-XiaoxiaoMultilingualNeural'
 }
-const XiaochenNeural: Voice = {
+const XiaochenMultilingualNeural: Voice = {
     name: 'zh-CN-XiaochenMultilingualNeural'
+}
+const XiaoyuMultilingualNeural:Voice = {
+  name: 'zh-CN-XiaoyuMultilingualNeural'
 }
 
 async function getAccessToken(): Promise<string> {
@@ -64,7 +67,7 @@ async function getAudioForSentence(sentence: string, voice: string, accessToken:
 
 export async function POST(request: Request) {
   try {
-    const { text, voice = XiaochenNeural.name } = await request.json();
+    const { text, voice = XiaochenMultilingualNeural.name } = await request.json();
 
     if (!text) {
       return NextResponse.json({ error: '缺少文本参数' }, { status: 400 });
