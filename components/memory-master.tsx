@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from "@/components/ui/button"
-import { Word } from '@/types/words'
+import { Word } from '@/lib/types/words'
 import { globalCache,saveCache } from './app-router'
 import ReactMarkdown from 'react-markdown'
 import { storyPromptTemplate } from '@/app/utils/promptTemplates'

@@ -6,7 +6,7 @@ import { motion } from "framer-motion"
 import Link from 'next/link'
 import Confetti from 'react-confetti'
 import { globalCache, Page, saveCache,pages } from '@/components/app-router'
-import { Word } from '@/types/words'
+import { Word } from '@/lib/types/words'
 
 const ButtonWrapper = motion(Button)
 

@@ -8,7 +8,7 @@ import { MemoryMasterComponent } from '@/components/memory-master'
 import { BackButton } from '@/components/BackButton'
 import { NextButton } from '@/components/NextButton'
 import { VocabularyBookComponent } from '@/components/vocabulary-book'
-import { Word } from '@/types/words'
+import { Word } from '@/lib/types/words'
 import TodayDialogComponent from './today-dialog';
 
 // 定义 GlobalCache 接口

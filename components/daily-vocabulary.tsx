@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Word } from '@/types/words'
+import { Word } from '@/lib/types/words'
 import { globalCache,saveCache } from './app-router'
 
 

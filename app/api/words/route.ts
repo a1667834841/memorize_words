@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { Word } from '@/types/words';
+import { Word } from '@/lib/types/words';
 
 const prisma = new PrismaClient();
 

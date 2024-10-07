@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Word,Pagination } from '@/types/words'
+import { Word,Pagination } from '@/lib/types/words'
 
 
 export function VocabularyBookComponent() {
