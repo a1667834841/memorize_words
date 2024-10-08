@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Phone, Send, Volume2, Copy, Check, PhoneOff } from 'lucide-react';
+import { Phone, Send, Volume2, Copy, Check, PhoneOff, ArrowLeft } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 import { isMobileDevice } from '@/hooks/use-media-query';
 import { Word } from '@/lib/types/words';
@@ -66,6 +66,13 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     };
   }, []);
 
+  // 在消息更新时滚动到顶部
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight  ;
+    }
+  }, [messages]); // 假设 messages 是存储对话消息的状态
+
   useEffect(() => {
     
     fetch('/api/daily-words')
@@ -75,8 +82,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
       setMessages([{ 
         role: 'model', 
         parts: [{ 
-          text: `你好呀！我是你的今天的英语老师！今天咱们学了以下单词，有12个单词诶！那你想从哪个单词开始聊起呢？`,
-          words: data.map(word => word.english)
+          text: `你好呀！我是你的今天的英语老师！今天咱们学了以下单词，有12个单词诶！那你想从哪个单词开始聊起呢？`
         }] 
       }]);
     })
@@ -86,9 +92,17 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   }, []);
 
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
+
+    // 当对话中的model的message的text中包含words中的一个，则将单词的hitCount+1
+    messages.forEach(message => {
+      if (message.role === 'model') {
+        words.forEach(word => {
+          if (message.parts[0].text.includes(word.english)) {
+            setWords(prevWords => prevWords.map(w => w.english === word.english ? { ...w, hitCount: (w.hitCount || 0) + 1 } : w));
+          }
+        });
+      }
+    });
   }, [messages]);
 
   useEffect(() => {
@@ -208,9 +222,11 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           
           if (result.reason === ResultReason.RecognizedSpeech) {
               setUserCurrentMessage(result.text)
-              setInput(result.text)
-              setIsCallActive(false)
-              handleSend()
+              setInput(result.text);
+              // setIsCallActive(false)
+              setTimeout(() => {
+                handleSend();
+              }, 1000);
           } else {
             setUserCurrentMessage(result.text);
             setInput('')
@@ -272,8 +288,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
-
         let fullMessage = '';
         let isDataReceived = false;
 
@@ -300,7 +314,12 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           textToSpeech(fullMessage  , messages.length - 1);
           for (let i = 0; i < fullMessage.length; i++) {
             setCurrentAiMessage(prev => prev + fullMessage[i]);
-            await new Promise(resolve => setTimeout(resolve, 20));
+            // 检查是否为标点符号
+            if (['，', '。', '？', '！'].includes(fullMessage[i])) {
+              await new Promise(resolve => setTimeout(resolve, 150));
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
           }
           setCurrentAiMessage(prev => prev + '@stop@');
         }
@@ -477,7 +496,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
         maxSize={40}
         onCollapse={() => setIsLeftPanelCollapsed(true)}
         onExpand={() => setIsLeftPanelCollapsed(false)}
-        className={ 'bg-gray-100 sm:max-[0px] md:max-[0px] ' + (isLeftPanelCollapsed ? "max-w-[0px]" : "")}
+        className={ 'bg-gray-100 hidden xs:block ' + (isLeftPanelCollapsed ? "xs:block" : "")}
       >
         <div className="h-full mt-[20%] p-4">
           {!isLeftPanelCollapsed && leftPanelContent}
@@ -486,21 +505,24 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={75}>
         <div className="flex flex-col">
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
-            <div className="flex flex-col justify-center items-left h-[80vh]">
-              <div className="w-full h-full p-5 overflow-y-auto">
+        <nav className="flex items-center justify-between bg-white p-4 shadow-md">
+              <button className="text-gray-600 hover:text-gray-800" onClick={() => navigateTo(pages[0])}>
+                <ArrowLeft size={24} />
+              </button>
+              <h1 className="text-xl font-bold text-center">
+              <span role="img" aria-label="可爱女生表情">👧</span> copi 
+              </h1>
+              <div className="w-8"></div> {/* 这是为了保持导航栏的平衡 */}
+            </nav>
+          <div  className="overflow-y-auto p-4 space-y-4 bg-gray-100">
+            
+            <div className="flex flex-col justify-center items-left h-[70vh]">
+              <div ref={chatContainerRef} className="w-full h-full overflow-y-auto text-sm">
                 {messages.map((message, index) => (
                   <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-                    <div className="flex flex-col max-w-[70%]">
+                    <div className="flex flex-col ">
                       <div className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
                         {message.parts[0].text}
-                        {message.parts[0].words && (
-                          <div>
-                            {message.parts[0].words.map((word, i) => (
-                              <Button size={"sm"} variant={"outline"} className="m-1" key={i}>{word}</Button>
-                            ))}
-                          </div>
-                        )}
                       </div>
                       {message.role === 'model' && (
                         <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
@@ -561,7 +583,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                 ))}
                 {isWaiting && !currentAiMessage && (
                   <div className="flex justify-start mb-4">
-                    <div className="max-w-[90%] p-3 items-right rounded-lg bg-gray-200">
+                    <div className=" p-3 items-right rounded-lg bg-gray-200">
                       <div className="animate-pulse flex space-x-2">
                         <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                         <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
@@ -572,6 +594,19 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                 )}
               </div>
             </div>
+          </div>
+          <div className="flex justify-center items-center space-x-2 mx-4 mt-2">
+            {words.map((word, index) => (
+              <button
+                key={index}
+                className={`w-4 h-2 rounded-sm transition-all duration-1500 ease-in-out
+                  ${word.hitCount && word.hitCount > 0 
+                    ? 'bg-yellow-400  animate-[pulse_1s_ease-in-out]' 
+                    : 'bg-gray-300'
+                  }`}
+                title={word.english}
+              ></button>
+            ))}
           </div>
           <div className="flex justify-end items-center space-x-2 mx-4 mt-2">
               <Switch
@@ -597,16 +632,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                 className="ml-auto "
               >
                 清除对话
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigateTo(pages[0]);
-                }}
-                className="ml-auto border-red-500 text-red-500 hover:bg-red-300 hover:text-white"
-              >
-                返回首页
               </Button>
             </div>
           <div className="p-2">

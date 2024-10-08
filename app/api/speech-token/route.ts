@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -24,6 +25,7 @@ export async function GET() {
 
     if (response.ok) {
       const token = await response.text();
+      // const token = randomUUID();
       return NextResponse.json({ token: token, region: speechRegion });
     } else {
       return NextResponse.json({ error: 'Failed to retrieve token' }, { status: response.status });
