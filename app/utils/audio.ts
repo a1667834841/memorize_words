@@ -82,19 +82,154 @@ function encodeWAV(samples: Float32Array, sampleRate: number) {
     return buffer;
 }
 
+class AudioPlayer {
+    private audioContext: AudioContext;
+  
+    constructor() {
+      this.audioContext = new (window.AudioContext);
+    }
+  
+    async playArrayBuffer(arrayBuffer: ArrayBuffer): Promise<void> {
+      try {
+        // 将 ArrayBuffer 解码为 AudioBuffer
+        const audioBuffer = await this.decodeAudioData(arrayBuffer);
+        
+        // 播放解码后的 AudioBuffer
+        this.playAudioBuffer(audioBuffer);
+      } catch (error) {
+        console.error('播放音频时出错:', error);
+      }
+    }
+  
+    private decodeAudioData(arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
+      return new Promise((resolve, reject) => {
+        this.audioContext.decodeAudioData(
+          arrayBuffer,
+          (buffer) => resolve(buffer),
+          (error) => reject(error)
+        );
+      });
+    }
+  
+    private playAudioBuffer(audioBuffer: AudioBuffer): void {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+      source.start(0);
+    }
+  
+    // 可选：如果需要停止所有音频播放
+    stopAll(): void {
+      this.audioContext.close().then(() => {
+        this.audioContext = new (window.AudioContext);
+      });
+    }
+  }
+  
 
-function saveAudioToFile(blob: Blob) {
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = blobUrl;
-    a.download = 'audio.wav';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+
+
+class MicrophoneSoundDetector {
+    private audioContext: AudioContext | null = null;
+    private analyser: AnalyserNode | null = null;
+    private dataArray: Uint8Array | null = null;
+    private microphone: MediaStreamAudioSourceNode | null = null;
+    private stream: MediaStream | null = null;
+    private onSoundDetected: () => void;
+    private animationFrameId: number | null = null;  // 新增：用于存储 requestAnimationFrame 的 ID
+    private stopRequested: boolean = false;  // 新增：用于标记停止请求
+
+    constructor(onSoundDetected: () => void) {
+        this.onSoundDetected = onSoundDetected;
+    }
+
+    public async start(): Promise<void> {
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            this.audioContext = new (window.AudioContext);
+            this.microphone = this.audioContext.createMediaStreamSource(this.stream);
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            this.microphone.connect(this.analyser);
+
+            this.detectSound();
+        } catch (err) {
+            console.error('无法访问麦克风', err);
+            this.stop();
+        }
+    }
+
+    public stop(): void {
+        console.log("停止声音检测");
+        
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+
+        this.cleanupResources();
+    }
+
+    private cleanupResources(): void {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+
+        if (this.microphone) {
+            this.microphone.disconnect();
+            this.microphone = null;
+        }
+
+        if (this.analyser) {
+            this.analyser.disconnect();
+            this.analyser = null;
+        }
+
+        if (this.audioContext) {
+            this.audioContext.close().then(() => {
+                console.log("音频上下文已关闭");
+            }).catch(err => {
+                console.error("关闭音频上下文时出错:", err);
+            });
+            this.audioContext = null;
+        }
+
+        this.dataArray = null;
+
+        console.log("声音检测已停止并清理资源");
+    }
+
+    private detectSound = (): void => {
+        if (!this.analyser || !this.dataArray) {
+            return;
+        }
+
+        this.analyser.getByteFrequencyData(this.dataArray);
+
+        let sum = 0;
+        for (let i = 0; i < this.dataArray.length; i++) {
+            sum += this.dataArray[i];
+        }
+        const average = sum / this.dataArray.length;
+
+        if (average > 20) {
+            console.log('检测到声音');
+            this.stop();  // 立即停止检测
+            this.onSoundDetected();  // 执行回调函数
+            return;  // 不再继续检测
+        }
+
+        this.animationFrameId = requestAnimationFrame(this.detectSound);
+    };
 }
+  
+  
+  
 
 export {
     audioToWav,
-    saveAudioToFile
+    MicrophoneSoundDetector,
+    AudioPlayer
 }

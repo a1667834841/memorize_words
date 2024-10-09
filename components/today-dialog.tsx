@@ -8,11 +8,16 @@ import { Word } from '@/lib/types/words';
 import { globalCache, Page,pages } from './app-router';
 import { Switch } from './ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import {  audioToWav, saveAudioToFile } from '@/app/utils/audio';
-import { useWebSocket } from '@/hooks/use-websocket';
-import { ResultReason } from 'microsoft-cognitiveservices-speech-sdk';
+import {  AudioPlayer, audioToWav,  MicrophoneSoundDetector } from '@/app/utils/audio';
+import { ResultReason, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
 import * as speechsdk from 'microsoft-cognitiveservices-speech-sdk';
 import { getSpeechToken } from '@/hooks/use-websocket';
+
+
+let globalRecognizer: speechsdk.SpeechRecognizer | null = null;
+let globalSpeechSynthesizer: speechsdk.SpeechSynthesizer | null = null;
+let tokenExpirationTime: number = 0;
+
 
 interface Message {
   role: string;
@@ -56,7 +61,10 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   const [audioLevel, setAudioLevel] = useState(0);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-  const [userCurrentMessage,setUserCurrentMessage] = useState('')
+  const [shouldSend, setShouldSend] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [playAudioBuffer,setPlayingAudioBuffer] = useState<ArrayBuffer | null>(null);
+  
 
   const isMounted = useRef(true);
 
@@ -66,12 +74,31 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     };
   }, []);
 
+  // 有音频数据时，播放
+  useEffect(() => {
+
+    if (playAudioBuffer) {
+      // 播放
+      const audioPlayer = new AudioPlayer()
+      audioPlayer.playArrayBuffer(playAudioBuffer)
+      setPlayingAudioBuffer(null)
+
+    }
+  },[playAudioBuffer])
+
   // 在消息更新时滚动到顶部
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight  ;
     }
   }, [messages]); // 假设 messages 是存储对话消息的状态
+
+  useEffect(() => {
+    if (shouldSend && input) {
+      handleSend();
+      setShouldSend(false);  // 重置标志
+    }
+  }, [shouldSend, input]);
 
   useEffect(() => {
     
@@ -120,7 +147,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
     if (currentAiMessage) {
         setMessages(prevMessages => {
-          const endResponseTime = Date.now();
           const lastMessage = prevMessages[prevMessages.length - 1];
           if (lastMessage.role === 'user') {
               return [...prevMessages, { role: 'model', parts: [{ text: currentAiMessage.replace('@stop@', '') }],requestTime }];
@@ -208,37 +234,149 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     }
   };
 
+  // 新增：初始化 recognizer 的函数
+  function initializeRecognizer(token: string, region: string): speechsdk.SpeechRecognizer {
+    const speechConfig = speechsdk.SpeechConfig.fromAuthorizationToken(token, region);
+    speechConfig.speechRecognitionLanguage = 'zh-CN';
+    
+    const audioConfig = speechsdk.AudioConfig.fromDefaultMicrophoneInput();
+    return new speechsdk.SpeechRecognizer(speechConfig, audioConfig);
+  }
+
+  // 新增一个· speechSynthesizer 函数
+  function initializeSpeechSynthesizer(token: string, region: string): speechsdk.SpeechSynthesizer {
+    const speechConfig = speechsdk.SpeechConfig.fromSubscription("YourSpeechKey", "YourSpeechRegion");
+    const audioConfig = speechsdk.AudioConfig.fromDefaultSpeakerOutput();
+
+    return new SpeechSynthesizer(speechConfig, audioConfig);
+  }
+
+
+  async function refreshTokenIfNeeded() {
+    const currentTime = Date.now();
+    if (currentTime >= tokenExpirationTime) {
+      const speechToken = await getSpeechToken();
+      if (speechToken?.token && speechToken?.region) {
+        if (globalRecognizer) {
+          globalRecognizer.authorizationToken = speechToken.token;
+        }
+        // 设置新的过期时间（9分钟后，留出一分钟的缓冲时间）
+        tokenExpirationTime = currentTime + 9 * 60 * 1000;
+        return { token: speechToken.token, region: speechToken.region };
+      } else {
+        throw new Error('无法获取新的语音令牌');
+      }
+    }
+    return null; // 令牌仍然有效
+  }
+
+  async function tts (message :string,messageIndex:number) {
+    // debugger
+    const refreshedToken = await refreshTokenIfNeeded();
+    if (refreshedToken) {
+      if (globalSpeechSynthesizer) {
+        globalSpeechSynthesizer.close();
+      }
+      globalSpeechSynthesizer = initializeSpeechSynthesizer(refreshedToken.token, refreshedToken.region)
+    } else if (!globalSpeechSynthesizer) {
+      // 如果recognizer不存在，使用当前令牌初始化
+      const speechToken = await getSpeechToken();
+      if (speechToken?.token && speechToken?.region) {
+        globalSpeechSynthesizer = initializeSpeechSynthesizer(speechToken.token, speechToken.region);
+        tokenExpirationTime = Date.now() + 9 * 60 * 1000;
+      } else {
+        throw new Error('无法获取语音令牌');
+      }
+    }
+
+    globalSpeechSynthesizer.speakTextAsync(message,
+      result => {
+        if (result) {
+          globalSpeechSynthesizer?.close();
+          setPlayingAudioBuffer(result.audioData);
+          setCurrentMessageIndex(messageIndex);
+      }
+      },error => {
+        console.log(error);
+        globalSpeechSynthesizer?.close();
+      }
+    )
+   
+  }
+
   async function sttFromMic() {
-    const speechToken = await getSpeechToken()
-    if (speechToken?.token && speechToken?.region) {
-      const speechConfig = speechsdk.SpeechConfig.fromAuthorizationToken(speechToken.token, speechToken.region);
-      speechConfig.speechRecognitionLanguage = 'zh-CN';
+    try {
+      const refreshedToken = await refreshTokenIfNeeded();
       
-      const audioConfig = speechsdk.AudioConfig.fromDefaultMicrophoneInput();
-      const recognizer = new speechsdk.SpeechRecognizer(speechConfig, audioConfig);
+      if (refreshedToken) {
+        // 如果令牌被刷新，重新初始化recognizer
+        if (globalRecognizer) {
+          globalRecognizer.close();
+        }
+        globalRecognizer = initializeRecognizer(refreshedToken.token, refreshedToken.region);
+      } else if (!globalRecognizer) {
+        // 如果recognizer不存在，使用当前令牌初始化
+        const speechToken = await getSpeechToken();
+        if (speechToken?.token && speechToken?.region) {
+          globalRecognizer = initializeRecognizer(speechToken.token, speechToken.region);
+          tokenExpirationTime = Date.now() + 9 * 60 * 1000;
+        } else {
+          throw new Error('无法获取语音令牌');
+        }
+      }
 
+      if (globalRecognizer) {
+        setupRecognizerCallbacks();
 
-      recognizer.recognizeOnceAsync(result => {
-          
-          if (result.reason === ResultReason.RecognizedSpeech) {
-              setUserCurrentMessage(result.text)
-              setInput(result.text);
-              // setIsCallActive(false)
-              setTimeout(() => {
-                handleSend();
-              }, 1000);
-          } else {
-            setUserCurrentMessage(result.text);
-            setInput('')
-            setIsCallActive(false)
-          }
-      });
-    } else {
-      console.error('语音令牌或区域未定义');
-      // 在这里处理错误情况
+        if (!isListening) {
+          globalRecognizer.startContinuousRecognitionAsync();
+          setIsListening(true);
+        } else {
+          globalRecognizer.stopContinuousRecognitionAsync();
+          setIsListening(false);
+        }
+      }
+    } catch (error) {
+      console.error('启动语音识别时出错:', error);
+      setIsListening(false);
     }
   }
 
+
+  
+  function setupRecognizerCallbacks() {
+    if (globalRecognizer) {
+      globalRecognizer.recognizing = (s, e) => {
+        // console.log(`recognizing text=`, e.result.text);
+        setInput(e.result.text)
+      };
+
+      globalRecognizer.recognized = (s, e) => {
+        // console.log(`recognized text=`, e.result.text);
+        setTimeout(() => {
+          setInput(e.result.text)
+          setShouldSend(true)
+        },500)
+
+      };
+
+      globalRecognizer.canceled = (s, e) => {
+        console.log(`canceled reason=${e.reason}`);
+        if (e.reason == speechsdk.CancellationReason.Error) {
+          console.log(`"CANCELED: ErrorCode=${e.errorCode}`);
+          console.log(`"CANCELED: ErrorDetails=${e.errorDetails}`);
+          console.log("CANCELED: Did you set the speech resource key and region values?");
+        }
+        setIsListening(false);
+      };
+
+      globalRecognizer.sessionStopped = (s, e) => {
+        console.log("Session stopped event");
+        setIsListening(false);
+        globalRecognizer?.stopContinuousRecognitionAsync()
+      };
+    }
+  }
 
   const playAudio = (url: string, messageIndex: number): Promise<void> => {
     return new Promise((resolve) => {
@@ -312,6 +450,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
         if (isDataReceived) {
           // 开始播放音频
           textToSpeech(fullMessage  , messages.length - 1);
+          // tts(fullMessage, messages.length - 1)
           for (let i = 0; i < fullMessage.length; i++) {
             setCurrentAiMessage(prev => prev + fullMessage[i]);
             // 检查是否为标点符号
@@ -333,7 +472,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   }
 
   const handleSend = async () => {
-    if (input.trim()) {
+    if (input && input.trim()) {
       const newUserMessage = { role: 'user', parts: [{ text: input }] };
       setInput('');
       setCurrentAiMessage('');
@@ -403,49 +542,17 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
 
   const startRecording = async () => {
+    setIsCallActive(true);
     sttFromMic()
-    // try {
-    //   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    //   const recorder = new MediaRecorder(stream);
-    //   setMediaRecorder(recorder);
-
-    //   recorder.ondataavailable = (event) => {
-    //     if (event.data.size > 0 && isConnected) {
-    //       event.data.arrayBuffer().then((arrayBuffer) => {
-    //         console.log("客户端发送 arrayBuffer type:",typeof arrayBuffer)
-
-    //         sendMessage(arrayBuffer);
-    //       });
-    //     }
-    //   };
-
-    //   recorder.start(100); // 每100ms发送一次数据
-      setIsCallActive(true);
-    // } catch (error) {
-    //   console.error('无法访问麦克风:', error);
-    // }
   };
 
   const stopRecording = () => {
     setIsCallActive(false);
-    // if (mediaRecorder) {
-    //   mediaRecorder.stop();
-    //   setIsCallActive(false);
-    //   if (isConnected) {
-    //     sendMessage('END_OF_STREAM');
-    //   }
-    // }
+    
+    globalRecognizer?.stopContinuousRecognitionAsync();
   };
 
-  // useEffect(() => {
-  //   if (lastMessage) {
-  //     const { text } = lastMessage;
-  //     if (text) {
-  //       setInput(text);
-  //       handleSend();
-  //     }
-  //   }
-  // }, [lastMessage]);
+
 
   const handleCallStart = () => {
     startRecording();
@@ -533,7 +640,8 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                                   <button 
                                     className={`${playingAudio === message.parts[0].text ? 'animate-pulse-fast' : ''}`}
                                     onClick={() => textToSpeech(message.parts[0].text, index)}
-                                    disabled={playingAudio !== null}
+                                    // onClick={() => tts(message.parts[0].text, index)}
+                                    // disabled={playingAudio !== null}
                                   >
                                     <Volume2 size={16} />
                                   </button>
@@ -649,7 +757,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                 placeholder="输入消息..."
                 onKeyPress={(e:any) => e.key === 'Enter' && handleSend()}
               />
-              {input.trim() && (
+              {input && (
                 <Button onClick={handleSend}>
                   <Send />
                 </Button>

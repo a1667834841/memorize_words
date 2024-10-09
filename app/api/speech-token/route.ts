@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
+import axios from 'axios';
 
 export async function GET() {
   try {
@@ -15,16 +16,14 @@ export async function GET() {
       'Content-Type': 'application/x-www-form-urlencoded'
     };
 
-    const response = await fetch(
+    const response = await axios.post(
       `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
-      {
-        method: 'POST',
-        headers: headers
-      }
+      null,  // 没有请求体
+      { headers: headers }
     );
 
-    if (response.ok) {
-      const token = await response.text();
+    if (response.status === 200) {
+      const token = response.data;
       // const token = randomUUID();
       return NextResponse.json({ token: token, region: speechRegion });
     } else {
