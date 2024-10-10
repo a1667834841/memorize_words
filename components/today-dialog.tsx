@@ -75,16 +75,16 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   }, []);
 
   // 有音频数据时，播放
-  useEffect(() => {
+  // useEffect(() => {
 
-    if (playAudioBuffer) {
-      // 播放
-      const audioPlayer = new AudioPlayer()
-      audioPlayer.playArrayBuffer(playAudioBuffer)
-      setPlayingAudioBuffer(null)
+  //   if (playAudioBuffer) {
+  //     // 播放
+  //     const audioPlayer = new AudioPlayer()
+  //     audioPlayer.playArrayBuffer(playAudioBuffer)
+  //     setPlayingAudioBuffer(null)
 
-    }
-  },[playAudioBuffer])
+  //   // }
+  // },[playAudioBuffer])
 
   // 在消息更新时滚动到顶部
   useEffect(() => {
@@ -245,8 +245,12 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
   // 新增一个· speechSynthesizer 函数
   function initializeSpeechSynthesizer(token: string, region: string): speechsdk.SpeechSynthesizer {
-    const speechConfig = speechsdk.SpeechConfig.fromSubscription("YourSpeechKey", "YourSpeechRegion");
+    const speechConfig = speechsdk.SpeechConfig.fromAuthorizationToken(token, region);
+    // zh-CN-XiaoyuMultilingualNeural
+    // zh-CN-XiaoxiaoMultilingualNeural
+    speechConfig.speechSynthesisVoiceName = 'zh-CN-XiaochenMultilingualNeural'
     const audioConfig = speechsdk.AudioConfig.fromDefaultSpeakerOutput();
+    
 
     return new SpeechSynthesizer(speechConfig, audioConfig);
   }
@@ -271,7 +275,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   }
 
   async function tts (message :string,messageIndex:number) {
-    // debugger
+    
     const refreshedToken = await refreshTokenIfNeeded();
     if (refreshedToken) {
       if (globalSpeechSynthesizer) {
@@ -292,9 +296,17 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     globalSpeechSynthesizer.speakTextAsync(message,
       result => {
         if (result) {
+          if (result.reason === ResultReason.SynthesizingAudioCompleted) {
+            console.log('SynthesizingAudioCompleted')
+          } else if (result.reason === ResultReason.Canceled) {
+            console.error(`Speech synthesis canceled: ${result.errorDetails}`);
+          }
           globalSpeechSynthesizer?.close();
-          setPlayingAudioBuffer(result.audioData);
-          setCurrentMessageIndex(messageIndex);
+          globalSpeechSynthesizer = null;
+            
+          
+          // setPlayingAudioBuffer(result.audioData);
+          // setCurrentMessageIndex(messageIndex);
       }
       },error => {
         console.log(error);
@@ -449,8 +461,9 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
         // 实现打字机效果
         if (isDataReceived) {
           // 开始播放音频
-          textToSpeech(fullMessage  , messages.length - 1);
-          // tts(fullMessage, messages.length - 1)
+          // textToSpeech(fullMessage  , messages.length - 1);
+          
+          tts(fullMessage, messages.length - 1)
           for (let i = 0; i < fullMessage.length; i++) {
             setCurrentAiMessage(prev => prev + fullMessage[i]);
             // 检查是否为标点符号
