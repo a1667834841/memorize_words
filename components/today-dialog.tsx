@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Phone, Send, Volume2, Copy, Check, PhoneOff, ArrowLeft } from 'lucide-react';
+import { Phone, Send, Volume2, Copy, Check, PhoneOff, ArrowLeft, Keyboard } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 import { isMobileDevice } from '@/hooks/use-media-query';
 import { Word } from '@/lib/types/words';
@@ -46,45 +46,32 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   const [words, setWords] = useState<Word[]>([])
   const [currentAiMessage, setCurrentAiMessage] = useState('');
   const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [audioCache, setAudioCache] = useState<{[key: string]: string}>({});
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [currentMessageIndex, setCurrentMessageIndex] = useState<number | null>(null);
   const [requestTime, setRequestTime] = useState(0);
-  const [audioQueue, setAudioQueue] = useState<Blob[]>([]);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [sourceNode, setSourceNode] = useState<AudioBufferSourceNode | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [shouldSend, setShouldSend] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [playAudioBuffer,setPlayingAudioBuffer] = useState<ArrayBuffer | null>(null);
+  const [showInput, setShowInput] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
 
   const isMounted = useRef(true);
+  const recognitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
       isMounted.current = false;
+      
     };
   }, []);
-
-  // 有音频数据时，播放
-  // useEffect(() => {
-
-  //   if (playAudioBuffer) {
-  //     // 播放
-  //     const audioPlayer = new AudioPlayer()
-  //     audioPlayer.playArrayBuffer(playAudioBuffer)
-  //     setPlayingAudioBuffer(null)
-
-  //   // }
-  // },[playAudioBuffer])
 
   // 在消息更新时滚动到顶部
   useEffect(() => {
@@ -167,72 +154,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     }
   }, [currentAiMessage, textToSpeechEnabled]);
 
-  const textToSpeech = async (text: string, messageIndex: number) => {
-    if (playingAudio === text) return;
-    if (!textToSpeechEnabled || isPlaying) return;
-    
-    const emojiRegex = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]/g;
-    text = text.replace('@stop@', '').replace(emojiRegex, '');
-    setPlayingAudio(text);
-    setCurrentMessageIndex(messageIndex);
-
-    try {
-      const audioStartTime = Date.now();
-      if (audioCache[text]) {
-        playAudio(audioCache[text], messageIndex);
-      } else {
-        const response = await fetch('/api/text-to-speech', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text }),
-        });
-
-        if (!response.ok) {
-          throw new Error('文本转语音请求失败');
-        }
-
-        const reader = response.body?.getReader();
-        const ctx = new AudioContext();
-        setAudioContext(ctx);
-
-        const streamAudio = async () => {
-          const chunks: Uint8Array[] = [];
-          while (true) {
-            const { done, value } = await reader?.read() ?? { done: true, value: undefined };
-            if (done) break;
-            chunks.push(value);
-            
-            const audioBuffer = await ctx.decodeAudioData(value.buffer);
-            const source = ctx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(ctx.destination);
-            setSourceNode(source);
-            source.start();
-            
-            await new Promise(resolve => source.onended = resolve);
-          }
-          const fullAudio = new Blob(chunks, { type: 'audio/mpeg' });
-          const audioUrl = URL.createObjectURL(fullAudio);
-          setAudioCache(prev => ({ ...prev, [text]: audioUrl }));
-        };
-
-        await streamAudio();
-      }
-      const audioEndTime = Date.now();
-      
-      setMessages(prevMessages => prevMessages.map((msg, index) => 
-        index === messageIndex
-          ? { ...msg, audioRequestTime: audioEndTime - audioStartTime, audioResponseTime: Date.now() - audioEndTime }
-          : msg
-      ));
-    } catch (error) {
-      console.error('文本转语音出错:', error);
-      setPlayingAudio(null);
-      setCurrentMessageIndex(null);
-    }
-  };
 
   // 新增：初始化 recognizer 的函数
   function initializeRecognizer(token: string, region: string): speechsdk.SpeechRecognizer {
@@ -275,7 +196,13 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   }
 
   async function tts (message :string,messageIndex:number) {
-    
+
+    if (!textToSpeechEnabled) {
+      return
+    }
+
+    const emojiRegex = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]/g;
+    const realMessage = message.replace(emojiRegex,"")
     const refreshedToken = await refreshTokenIfNeeded();
     if (refreshedToken) {
       if (globalSpeechSynthesizer) {
@@ -293,7 +220,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
       }
     }
 
-    globalSpeechSynthesizer.speakTextAsync(message,
+    globalSpeechSynthesizer.speakTextAsync(realMessage,
       result => {
         if (result) {
           if (result.reason === ResultReason.SynthesizingAudioCompleted) {
@@ -304,9 +231,9 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           globalSpeechSynthesizer?.close();
           globalSpeechSynthesizer = null;
             
-          
-          // setPlayingAudioBuffer(result.audioData);
-          // setCurrentMessageIndex(messageIndex);
+          setCurrentMessageIndex(messageIndex);
+          // 保存音频cache
+          setAudioCache(prev => ({ ...prev, [realMessage]: URL.createObjectURL(new Blob([result.audioData], { type: 'audio/mpeg' })) }));
       }
       },error => {
         console.log(error);
@@ -360,16 +287,20 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     if (globalRecognizer) {
       globalRecognizer.recognizing = (s, e) => {
         // console.log(`recognizing text=`, e.result.text);
-        setInput(e.result.text)
+        // 添加messages最后一条消息
+        
       };
 
       globalRecognizer.recognized = (s, e) => {
-        // console.log(`recognized text=`, e.result.text);
-        setTimeout(() => {
-          setInput(e.result.text)
-          setShouldSend(true)
-        },500)
+        // 立即更新输入
+        setInput(e.result.text);
+        setShouldSend(true)
 
+
+        // 设置新的超时
+        // recognitionTimeoutRef.current = setTimeout(() => {
+        //   setShouldSend(true);
+        // }, 3000);
       };
 
       globalRecognizer.canceled = (s, e) => {
@@ -390,19 +321,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     }
   }
 
-  const playAudio = (url: string, messageIndex: number): Promise<void> => {
-    return new Promise((resolve) => {
-      const audio = new Audio(url);
-      audio.onended = () => {
-        setIsAudioPlaying(false);
-        setPlayingAudio(null);
-        setCurrentMessageIndex(null);
-        URL.revokeObjectURL(url); // 释放 URL 对象
-        resolve();
-      };
-      audio.play();
-    });
-  };
 
   const messageSend = async (messages: Message[]) => {
   
@@ -461,8 +379,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
         // 实现打字机效果
         if (isDataReceived) {
           // 开始播放音频
-          // textToSpeech(fullMessage  , messages.length - 1);
-          
           tts(fullMessage, messages.length - 1)
           for (let i = 0; i < fullMessage.length; i++) {
             setCurrentAiMessage(prev => prev + fullMessage[i]);
@@ -495,13 +411,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     }
   };
 
-  const handleVoiceRecord = () => {
-    setIsRecording(true);
-  };
 
-  const handleVoiceStop = () => {
-    setIsRecording(false);
-  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -555,7 +465,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
 
   const startRecording = async () => {
-    setIsCallActive(true);
+    // setIsCallActive(true);
     sttFromMic()
   };
 
@@ -572,39 +482,53 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
   };
 
   const handleCallEnd = () => {
+    setIsRecording(false);
     stopRecording();
   };
 
-  // 模拟音频级别变化
-  useEffect(() => {
-    if (isCallActive && mediaRecorder) {
-      const audioContext = new AudioContext();
-      const analyser = audioContext.createAnalyser();
-      const microphone = audioContext.createMediaStreamSource(mediaRecorder.stream);
-      microphone.connect(analyser);
-      analyser.fftSize = 256;
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      const updateAudioLevel = () => {
-        analyser.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((acc, val) => acc + val, 0) / bufferLength;
-        setAudioLevel(average / 128);  // 归一化到0-1范围
-        if (isCallActive) {
-          requestAnimationFrame(updateAudioLevel);
-        }
-      };
-
-      updateAudioLevel();
-
-      return () => {
-        microphone.disconnect();
-        audioContext.close();
-      };
+  const handleRecordSwitch = () => {
+    if (!isRecording) {
+      setIsTransitioning(true);
+      setIsRecording(true);
+      // 假设这是开始录音的函数
+      startRecording().then(() => {
+        setIsListening(true);
+        setIsTransitioning(false);
+      });
+    } else {
+      setIsListening(false);
+      setIsRecording(false);
+      // 假设这是停止录音的函数
+      stopRecording();
     }
-  }, [isCallActive, mediaRecorder]);
+  };
 
+  const handleRecordEnd = () => {
+    setIsRecording(!isRecording);
+    stopRecording();
+  };
 
+  // 在组件卸载时清除超时
+  useEffect(() => {
+    return () => {
+      if (recognitionTimeoutRef.current) {
+        clearTimeout(recognitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // 组件挂载时的逻辑（如果有的话）
+
+    // 返回一个清理函数，它会在组件卸载时执行
+    return () => {
+      if (globalRecognizer) {
+        console.log('Closing speech recognizer...');
+        globalRecognizer.close();
+        globalRecognizer = null;
+      }
+    };
+  }, []); // 空依赖数组意味着这个效果只在组件挂载和卸载时运行
 
   return (
     <ResizablePanelGroup direction="horizontal" className="relative">
@@ -652,9 +576,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                                 <TooltipTrigger asChild>
                                   <button 
                                     className={`${playingAudio === message.parts[0].text ? 'animate-pulse-fast' : ''}`}
-                                    onClick={() => textToSpeech(message.parts[0].text, index)}
-                                    // onClick={() => tts(message.parts[0].text, index)}
-                                    // disabled={playingAudio !== null}
+                                    onClick={() => tts(message.parts[0].text, index)}
                                   >
                                     <Volume2 size={16} />
                                   </button>
@@ -716,6 +638,8 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
               </div>
             </div>
           </div>
+
+
           <div className="flex justify-center items-center space-x-2 mx-4 mt-2">
             {words.map((word, index) => (
               <button
@@ -729,6 +653,8 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
               ></button>
             ))}
           </div>
+
+
           <div className="flex justify-end items-center space-x-2 mx-4 mt-2">
               <Switch
                 id="text-to-speech"
@@ -755,26 +681,59 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
                 清除对话
               </Button>
             </div>
+
+            
           <div className="p-2">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 relative "> {/* 添加 overflow-hidden */}
               <Button
                 variant="outline"
                 size="icon"
-                onClick={handleCallStart}
+                onClick={() => setShowInput(!showInput)}
+                className="z-10"
               >
-                <Phone className={isCallActive ? 'text-green-500' : ''} />
+                {showInput ? <Phone className="w-5 h-5" /> : <Keyboard className="w-5 h-5" />}
               </Button>
-              <Input
-                value={input}
-                onChange={(e:any) => setInput(e.target.value)}
-                placeholder="输入消息..."
-                onKeyPress={(e:any) => e.key === 'Enter' && handleSend()}
-              />
-              {input && (
-                <Button onClick={handleSend}>
-                  <Send />
+              <div className="flex-grow ">
+                <div className={`flex transition-all duration-300 ease-in-out ${showInput ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none transition-opacity duration-500'}`}>
+                  <Input
+                    value={input}
+                    onChange={(e:any) => setInput(e.target.value)}
+                    placeholder="输入消息..."
+                    onKeyPress={(e:any) => e.key === 'Enter' && handleSend()}
+                    className={`flex-grow   px-3 py-2 rounded-md bg-gray-200` }
+                    />
+                  {input && (
+                    <Button onClick={handleSend} className="ml-2">
+                      <Send className="w-5 h-5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className={`absolute inset-y-0 left-10 right-0 transition-all duration-300 ease-in-out ${showInput ? 'translate-x-full' : 'translate-x-0'}`}>
+                <Button
+                  variant={isRecording && isListening ? "destructive" : "default"}
+                  className={`w-full h-full transition-all duration-300 ease-in-out text-white
+                    ${showInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+                    ${isRecording 
+                      ? 'shadow-inner transform scale-95' 
+                      : 'shadow-md'
+                    }
+                    ${isTransitioning ? 'animate-pulse' : ''}
+                  `}
+                  onClick={handleRecordSwitch}
+                >
+                  {isRecording ? (
+                    <span className="flex items-center justify-center">
+                      对话中
+                      <span className="ml-1 flex">
+                        <span className="animate-bounce-dot">.</span>
+                        <span className="animate-bounce-dot animation-delay-200">.</span>
+                        <span className="animate-bounce-dot animation-delay-400">.</span>
+                      </span>
+                    </span>
+                  ) : '按住说话'}
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -795,7 +754,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           <Button
             variant="destructive"
             size="lg"
-            className="mt-4"
+            className="mt-4"  
             onClick={handleCallEnd}
           >
             <PhoneOff />
