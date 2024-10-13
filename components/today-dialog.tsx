@@ -73,6 +73,35 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     };
   }, []);
 
+  
+  // 在组件卸载时清除超时
+  useEffect(() => {
+    return () => {
+      if (recognitionTimeoutRef.current) {
+        clearTimeout(recognitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // 组件挂载时的逻辑（如果有的话）
+
+    // 返回一个清理函数，它会在组件卸载时执行
+    return () => {
+      if (globalRecognizer) {
+        console.log('Closing speech recognizer...');
+        globalRecognizer.close();
+        globalRecognizer = null;
+      }
+      if (globalSpeechSynthesizer) {
+        console.log('Closing speech synthesizer...');
+        globalSpeechSynthesizer.close();
+        globalSpeechSynthesizer = null;
+      }
+    };
+  }, []); // 空依赖数组意味着这个效果只在组件挂载和卸载时运行
+
+
   // 在消息更新时滚动到顶部
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -507,28 +536,6 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     setIsRecording(!isRecording);
     stopRecording();
   };
-
-  // 在组件卸载时清除超时
-  useEffect(() => {
-    return () => {
-      if (recognitionTimeoutRef.current) {
-        clearTimeout(recognitionTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    // 组件挂载时的逻辑（如果有的话）
-
-    // 返回一个清理函数，它会在组件卸载时执行
-    return () => {
-      if (globalRecognizer) {
-        console.log('Closing speech recognizer...');
-        globalRecognizer.close();
-        globalRecognizer = null;
-      }
-    };
-  }, []); // 空依赖数组意味着这个效果只在组件挂载和卸载时运行
 
   return (
     <ResizablePanelGroup direction="horizontal" className="relative">
