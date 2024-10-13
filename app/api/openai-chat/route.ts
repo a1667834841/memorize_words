@@ -9,7 +9,7 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages,systemPrompt } = await req.json();
   const openaiMessages = messages.map((message: any) => ({
     role: message.role === 'user' ? 'user' : 'assistant',
     content: message.parts.map((part: any) => part.text).join(''),
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const realMessages = [
     {
       role: 'system',
-      content: chatPromptTemplate()
+      content: systemPrompt
     },
     ...openaiMessages
   ]
