@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function POST() {
   try {
     const speechKey = process.env.AZURE_SPEECH_KEY;
     const speechRegion = process.env.AZURE_SPEECH_REGION;
