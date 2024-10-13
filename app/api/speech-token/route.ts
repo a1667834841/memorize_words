@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
-import axios from 'axios';
 
 export async function GET() {
   try {
@@ -8,7 +7,7 @@ export async function GET() {
     const speechRegion = process.env.AZURE_SPEECH_REGION;
 
     if (!speechKey || !speechRegion) {
-      return NextResponse.json({ error: 'Speech service configuration is missing' }, { status: 500 });
+      return NextResponse.json({ error: '语音服务配置缺失' }, { status: 500 });
     }
 
     const headers = {
@@ -16,21 +15,23 @@ export async function GET() {
       'Content-Type': 'application/x-www-form-urlencoded'
     };
 
-    const response = await axios.post(
+    const response = await fetch(
       `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
-      null,  // 没有请求体
-      { headers: headers }
+      {
+        method: 'POST',
+        headers: headers,
+        next: {revalidate:600} // 保证nextjs路由数据 在vercle上10分钟后失效
+      }
     );
 
-    if (response.status === 200) {
-      const token = response.data;
-      // const token = randomUUID();
+    if (response.ok) {
+      const token = await response.text();
       return NextResponse.json({ token: token, region: speechRegion });
     } else {
-      return NextResponse.json({ error: 'Failed to retrieve token' }, { status: response.status });
+      return NextResponse.json({ error: '获取令牌失败' }, { status: response.status });
     }
   } catch (error) {
-    console.error('Error retrieving speech token:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('获取语音令牌时出错:', error);
+    return NextResponse.json({ error: '内部服务器错误' }, { status: 500 });
   }
 }
