@@ -424,8 +424,8 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     realMessages[0].parts[0].text += ` learnSituations:`+JSON.stringify(initWords)
     
     const fullMessage = await messagesPostToAi(realMessages,chatPromptTemplate())
-    const picketMessage = await messagesPostToAi([realMessages[realMessages.length-1]],englishGrammaticalTeacherTemplate())
-    console.log("picketMessage:{}",picketMessage)
+    // const picketMessage = await messagesPostToAi([realMessages[realMessages.length-1]],englishGrammaticalTeacherTemplate())
+    // console.log("picketMessage:{}",picketMessage)
     setIsWaitingAiChat(false)
     const responseTime = Date.now() - startTime
     setShouldSend(false);
