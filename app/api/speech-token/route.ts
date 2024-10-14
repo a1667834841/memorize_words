@@ -19,8 +19,7 @@ export async function POST() {
       `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
       {
         method: 'POST',
-        headers: headers,
-        next: {revalidate:600} // 保证nextjs路由数据 在vercle上10分钟后失效
+        headers: headers
       }
     );
 
