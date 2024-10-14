@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
+import axios from 'axios';
 
-export async function POST() {
+export async function GET() {
   try {
     const speechKey = process.env.AZURE_SPEECH_KEY;
     const speechRegion = process.env.AZURE_SPEECH_REGION;
@@ -10,21 +11,19 @@ export async function POST() {
       return NextResponse.json({ error: '语音服务配置缺失' }, { status: 500 });
     }
 
-    const headers = {
-      'Ocp-Apim-Subscription-Key': speechKey,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    };
-
-    const response = await fetch(
+    const response = await axios.post(
       `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
+      null,
       {
-        method: 'POST',
-        headers: headers
+        headers: {
+          'Ocp-Apim-Subscription-Key': speechKey,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
       }
     );
 
-    if (response.ok) {
-      const token = await response.text();
+    if (response.status === 200) {
+      const token = response.data;
       return NextResponse.json({ token: token, region: speechRegion });
     } else {
       return NextResponse.json({ error: '获取令牌失败' }, { status: response.status });

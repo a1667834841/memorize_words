@@ -6,7 +6,7 @@ export const getSpeechToken = async () => {
             next: {
               revalidate: 600, // 10 min
             },
-            cache: 'no-store'
+            cache: 'no-store',
           });
         if (response.ok) {
             const data = await response.json();

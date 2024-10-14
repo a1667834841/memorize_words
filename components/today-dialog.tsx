@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import {  AudioPlayer, audioToWav,  MicrophoneSoundDetector } from '@/app/utils/audio';
 import { ResultReason, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
 import * as speechsdk from 'microsoft-cognitiveservices-speech-sdk';
-import { getSpeechToken } from '@/hooks/use-websocket';
 import { chatPromptTemplate, englishGrammaticalTeacherTemplate } from '@/app/utils/promptTemplates';
 
 
@@ -175,6 +174,27 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     setIsLeftPanelCollapsed(isMobileDevice());
   }, []);
 
+
+  const getSpeechToken = async () => {
+    try {
+        const response = await fetch('/api/speech-token', {
+            next: {
+              revalidate: 600, // 10 min
+            },
+            cache: 'no-store',
+          });
+        if (response.ok) {
+            const data = await response.json();
+            return data;
+        } else {
+            console.error('获取语音令牌失败');
+            return null;
+        }
+    } catch (error) {
+        console.error('获取语音令牌时出错:', error);
+        return null;
+    }
+};
 
 
 
@@ -356,6 +376,7 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
           console.log("CANCELED: Did you set the speech resource key and region values?");
         }
         setIsListening(false);
+        setIsRecording(false)
       };
 
       globalRecognizer.sessionStopped = (s, e) => {
