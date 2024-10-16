@@ -177,11 +177,14 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
 
   const getSpeechToken = async () => {
     try {
-        const response = await fetch('/api/speech-token', {
+        const response = await fetch(`/api/speech-token?timestamp=${new Date().getTime()}`, {
             next: {
               revalidate: 600, // 10 min
             },
             cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
           });
         if (response.ok) {
             const data = await response.json();
