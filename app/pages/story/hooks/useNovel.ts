@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useRef } from 'react';
 import { Novel, NovelFragment } from '../types/novel';
 import { messagesPostToAi } from '@/app/utils/api';

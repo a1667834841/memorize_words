@@ -1,13 +1,14 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSpring } from 'react-spring';
 import { useDrag } from '@use-gesture/react';
 import { NovelIndexPage } from './components/NovelIndexPage';
 import { NovelContentPage } from './components/NovelContentPage';
 import { useNovel } from './hooks/useNovel';
+import { DailyWordsProvider } from '@/components/DailyWordsContext';
 
-export default function StoryPage() {
+function StoryPageContent() {
   const {
     votes,
     isReading,
@@ -23,6 +24,13 @@ export default function StoryPage() {
   } = useNovel();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWindowWidth(window.innerWidth);
+    }
+  }, []);
 
   const toggleSettings = () => {
     setShowSettings(prev => !prev);
@@ -52,7 +60,7 @@ export default function StoryPage() {
     if (down) {
       contentApi.start({ x: mx, immediate: true });
     } else {
-      const threshold = window.innerWidth / 4;
+      const threshold = windowWidth / 4;
       if (Math.abs(mx) > threshold || Math.abs(vx) > 1) {
         if (dx > 0 && currentFragmentIndex > 0) {
           setCurrentFragmentIndex(prev => prev - 1);
@@ -64,7 +72,7 @@ export default function StoryPage() {
     }
   }, {
     axis: 'x',
-    bounds: { left: -window.innerWidth, right: window.innerWidth },
+    bounds: { left: -windowWidth, right: windowWidth },
     rubberband: true
   });
 
@@ -96,5 +104,13 @@ export default function StoryPage() {
         )
       )}
     </div>
+  );
+}
+
+export default function StoryPage() {
+  return (
+    <DailyWordsProvider>
+      <StoryPageContent />
+    </DailyWordsProvider>
   );
 }
