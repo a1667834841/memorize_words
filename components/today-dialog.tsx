@@ -12,6 +12,7 @@ import {  AudioPlayer, audioToWav,  MicrophoneSoundDetector } from '@/app/utils/
 import { ResultReason, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
 import * as speechsdk from 'microsoft-cognitiveservices-speech-sdk';
 import { chatPromptTemplate, englishGrammaticalTeacherTemplate } from '@/app/utils/promptTemplates';
+import { Message } from '@/lib/types/message';
 
 
 let globalRecognizer: speechsdk.SpeechRecognizer | null = null;
@@ -19,19 +20,7 @@ let globalSpeechSynthesizer: speechsdk.SpeechSynthesizer | null = null;
 let tokenExpirationTime: number = 0;
 
 
-interface Message {
-  role: string;
-  parts: Part[];
-  requestTime?: number;
-  responseTime?: number;
-  audioRequestTime?: number;
-  audioResponseTime?: number;
-  show?: boolean; // 是否展示
-}
-interface Part {
-  text: string;
-  words?: string[];
-}
+
 
 interface TodayDialogProps {
   navigateTo: (page: Page) => void;

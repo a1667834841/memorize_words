@@ -12,6 +12,7 @@ import { NextButton } from '@/components/NextButton'
 import { VocabularyBookComponent } from '@/components/vocabulary-book'
 import { Word } from '@/lib/types/words'
 import TodayDialogComponent from './today-dialog';
+import StoryPage from '@/app/pages/story/page';
 
 // 定义 GlobalCache 接口
 export interface GlobalCache {
@@ -56,12 +57,14 @@ export type Page = {
 export const pages: Page[] = [
   { name: "首页", route: 'home', enable: true, display:false, description: "首页", component: Home, icon: <HomeIcon />, hasBackButton: false, hasNextButton: false },
   { name: "今日单词", route: 'dailyVocabulary', enable: true, display:true, description: "查看今日单词进行学习", component: DailyVocabularyComponent, icon: <Book />, hasBackButton: true, hasNextButton: true },
-  { name: "故事大王", route: 'memoryGame', enable: true, display:true, description: "ai根据今日单词生成故事", component: MemoryMasterComponent, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
+  { name: "24小时便利店", route: 'memoryGame', enable: true, display:true, description: "cici日常便利店兼职故事", component: StoryPage, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
   { name: "情景对话", route: "todayDialog", enable: true, display:true, description: "与超自然ai对话", component: TodayDialogComponent, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
   { name: "消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分", component: WordMatchingGameComponent, icon: <Gamepad />, hasBackButton: true, hasNextButton: false },
   { name: "单词本", route: 'vocabularyBook', enable: true, display:true, description: "查看单词本", component: VocabularyBookComponent, icon: <BookOpen />, hasBackButton: true, hasNextButton: false },
   { name: "设置", route: 'settings', enable: true, display:true, description: "应用设置", component: null, icon: <Settings />, hasBackButton: true, hasNextButton: false },
 ]
+
+
 
 // 修改 AppRouter 组件
 export function AppRouter() {
@@ -72,7 +75,6 @@ export function AppRouter() {
     loadCache()
     setIsLoading(false)
   }, [])
-
   const navigateTo = (page: Page) => {
     if(!page.enable) return
     setCurrentPage(page)

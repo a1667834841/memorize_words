@@ -20,6 +20,7 @@ export interface Word {
   difficulty?: string;
   selected?: boolean; // 添加选中状态属性
   hitCount?: number; // 添加命中次数属性
+  showdNovel?: boolean | false; // 添加是否在小说中显示
 }
 
 export interface Translation {

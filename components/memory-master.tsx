@@ -1,209 +1,314 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
+import Image from 'next/image'
+import { MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useSpring, animated } from 'react-spring'
+import { useDrag } from '@use-gesture/react'
 import { Word } from '@/lib/types/words'
-import { globalCache,saveCache } from './app-router'
-import ReactMarkdown from 'react-markdown'
-import { storyPromptTemplate } from '@/app/utils/promptTemplates'
+import { messagesPostToAi } from '@/app/utils/api'
+import { Message } from '@/lib/types/message'
 
-const storyTypes = [
-  { title: "现实主义", description: "描述日常生活中的真实情感、社会问题或人物命运，着重刻画现实环境中的人性和社会现象。" },
-  { title: "科幻", description: "以科学理论为基础，想象未来科技发展可能对社会、人类及宇宙产生的影响。" },
-  { title: "悬疑", description: "通过巧妙的情节设计和引人入胜的悬念，营造紧张刺激的氛围，通常涉及谜题、犯罪或解密。" },
-  { title: "武侠", description: "以古代江湖为背景，围绕侠义精神和武术展开，塑造英雄人物和他们的冒险经历。" },
-  { title: "玄幻", description: "通过虚构的世界、超自然的力量和神秘的元素构建故事，通常有复杂的设定和强烈的幻想色彩。" },
-  { title: "讽刺", description: "通过讽刺和幽默的手法，揭露社会现象、政治弊端或人性弱点，常带有批判性和戏谑性。" },
-]
+// 定义小说片段对象
+interface NovelFragment {
+  title: string;
+  content: string;
+  nextWord: string;
+}
+
+// 定义小说对象
+interface Novel {
+  title: string;
+  characters: string[];
+  locations: string[];
+  fragments: NovelFragment[];
+}
 
 export function MemoryMasterComponent() {
-  const [words, setWords] = useState<Word[]>([])
-  const [selectedWords, setSelectedWords] = useState<Word[]>([])
-  const [selectedStoryType, setSelectedStoryType] = useState<string>("")
-  const [generatedStory, setGeneratedStory] = useState<string>("")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const storyRef = useRef<HTMLDivElement>(null)
+  const [votes, setVotes] = useState({ recommend: 0, neutral: 0, dislike: 0 })
+  const [isReading, setIsReading] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [currentNovel, setCurrentNovel] = useState<Novel | null>(null)
+  const [currentFragmentIndex, setCurrentFragmentIndex] = useState(0)
+  const [dailyWords, setDailyWords] = useState<Word[]>([])
+  const [fragments, setFragments] = useState<NovelFragment[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  // 示例小说数据
+  const exampleNovel: Novel = {
+    title: "示例小说标题",
+    characters: ["主角", "配角", "反派"],
+    locations: ["城市", "乡村", "山区"],
+    fragments: [
+      { title: "第一章", content: "这是第一章的内容...", nextWord: "" },
+      { title: "第二章", content: "这是第二章的内容...", nextWord: "" },
+      { title: "第三章", content: "这是第三章的内容...", nextWord: "" },
+    ]
+  }
 
   useEffect(() => {
-    if (globalCache.words && globalCache.words.length > 0) {
-      setWords(globalCache.words)
-      setSelectedWords(globalCache.words.filter(word => word.selected))
-    } else {
-      fetch('/api/daily-words')
-        .then(response => response.json())
-        .then((data: Word[]) => {
-          setWords(data)
-          globalCache.words = data
-          saveCache()
-        })
-        .catch(error => {
-          console.error('Error fetching words:', error)
-        })
-    }
+    setCurrentNovel(exampleNovel)
+    getDailyWords()
   }, [])
 
-  const handleWordSelection = (word: Word) => {
-    if (selectedWords.includes(word)) {
-      setSelectedWords(selectedWords.filter(w => w !== word))
-    } else if (selectedWords.length < 10) {
-      setSelectedWords([...selectedWords, word])
-    }
+  const handleVote = (type: 'recommend' | 'neutral' | 'dislike') => {
+    setVotes(prev => ({ ...prev, [type]: prev[type] + 1 }))
   }
 
-  const handleStoryTypeSelection = (type: string) => {
-    setSelectedStoryType(type === selectedStoryType ? "" : type)
-  }
+  const getDailyWords = () => {
 
-  const generateStory = async () => {
-    setIsGenerating(true)
-    setGeneratedStory("")
-    const prompt = storyPromptTemplate(selectedStoryType, selectedWords.map(word => word.english+"（"+word.type+"）"), selectedWords.length * 50)
-
-    try {
-      const response = await fetch('/api/generate-story-gemini', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt }),
+    fetch('/api/daily-words')
+      .then(response => response.json())
+      .then((data: Word[]) => {
+        setDailyWords(data)
       })
+      .catch(error => {
+        console.error('获取单词时出错:', error)
+      })
+  }
 
-      if (!response.ok) {
-        throw new Error('Story generation failed')
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) {
-        throw new Error('Failed to get reader from response')
-      }
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          break
-        }
-        const chunk = new TextDecoder().decode(value)
-        const processedChunk = chunk.replace(/[（(]([a-zA-Z]+)[）)]/g, '$1')
-        .replace("{humanized_text}","").replace("```中文","").replace("```","")
-        setGeneratedStory(prev => prev + processedChunk.trim())
-        if (storyRef.current) {
-          storyRef.current.scrollTop = storyRef.current.scrollHeight
-        }
-      }
-    } catch (error) {
-      console.error('Error generating story:', error)
-      setGeneratedStory("抱歉，生成故事时出现错误。请稍后再试。")
-    } finally {
-      setIsGenerating(false)
+  const startReading = async() => {
+    setIsReading(true)
+    if (fragments.length === 0) {
+      await fetchNextFragment()
     }
   }
 
-  const highlightWords = (text: string) => {
-    if (!text || text === undefined) {
-      return text
+  const toggleSettings = () => {
+    setShowSettings(prevState => !prevState)
+    console.log('切换设置面板:', !showSettings) // 添加日志
+  }
+
+  // 设置面板的动画
+  const [{ y }, settingsApi] = useSpring(() => ({ y: 100 }))
+
+  // 拖拽手势（设置面板）
+  const bindSettings = useDrag(({ down, movement: [, my] }) => {
+    settingsApi.start({ y: down ? my : 0, immediate: down })
+    if (!down && my > 50) {
+      setShowSettings(false)
     }
-    // 移除开头的换行符
-    text = text.trimStart();
-    const regex = new RegExp(`\\b(${selectedWords.map(word => word.english).join('|')})\\b`, 'gi');
-    return text.split(regex).map((part, index) => 
-      regex.test(part) ? <Button key={index} className="py-0 px-1 h-auto font-bold">{part}</Button> : part
-    );
-  };
+  }, {
+    from: () => [0, y.get()],
+    filterTaps: true,
+    bounds: { top: 0 },
+    rubberband: true
+  })
+
+  // 更新设置面板位置
+  useEffect(() => {
+    settingsApi.start({ y: showSettings ? 0 : 100 })
+  }, [showSettings])
+
+  // 小说内容的动画
+  const [{ x }, contentApi] = useSpring(() => ({ x: 0 }))
+
+  // 拖拽手势（小说内容）
+  const bindContent = useDrag(({ down, movement: [mx], direction: [dx], velocity: [vx] }) => {
+    if (down) {
+      contentApi.start({ x: mx, immediate: true })
+    } else {
+      const threshold = window.innerWidth / 4
+      if (Math.abs(mx) > threshold || Math.abs(vx) > 1) {
+        if (dx > 0 && currentFragmentIndex > 0) {
+          setCurrentFragmentIndex(prev => prev - 1)
+        } else if (dx < 0 && currentNovel && currentFragmentIndex < currentNovel.fragments.length - 1) {
+          setCurrentFragmentIndex(prev => prev + 1)
+        }
+      }
+      contentApi.start({ x: 0, immediate: false })
+    }
+  }, {
+    axis: 'x',
+    bounds: { left: -window.innerWidth, right: window.innerWidth },
+    rubberband: true
+  })
+
+  // 渲染小说片段
+  const renderNovelFragment = (fragment: NovelFragment) => (
+    <div className="h-full max-w-2xl mx-auto rounded-lg shadow-md p-8 overflow-y-auto">
+      <h2 className="text-2xl font-bold mb-4">{fragment.title}</h2>
+      <p className="text-lg leading-relaxed">{fragment.content}</p>
+    </div>
+  )
+
+  // 小说封面页
+  const NovelIndexPage: React.FC<{
+    currentNovel: Novel | null;
+    votes: { recommend: number; neutral: number; dislike: number };
+    handleVote: (type: 'recommend' | 'neutral' | 'dislike') => void;
+    startReading: () => void;
+  }> = ({ currentNovel, votes, handleVote, startReading }) => {
+    return (
+      <div className="container mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-screen bg-gray-100 text-gray-800 w-full flex-shrink-0">
+        <div className="w-full max-w-lg flex flex-col items-center bg-white rounded-lg shadow-md p-8">
+          {/* 图片占位符 */}
+          <div className="w-full aspect-[3/4] relative mb-8 shadow-md">
+            <Image
+              src="/placeholder-image.jpg"
+              alt="小说封面"
+              layout="fill"
+              objectFit="cover"
+              className="rounded-lg"
+            />
+          </div>
+
+          {/* 小说标题 */}
+          <h1 className="text-3xl font-serif font-bold mb-8 text-gray-700">{currentNovel?.title}</h1>
+
+          {/* 投票按钮 */}
+          <div className="flex justify-between w-full mb-8">
+            {['recommend', 'neutral', 'dislike'].map((type) => (
+              <Button
+                key={type}
+                onClick={() => handleVote(type as 'recommend' | 'neutral' | 'dislike')}
+                className="w-[30%] text-white transition duration-300 ease-in-out"
+              >
+                {type === 'recommend' ? '推荐' : type === 'neutral' ? '一般' : '不行'} ({votes[type as keyof typeof votes]})
+              </Button>
+            ))}
+          </div>
+
+          {/* 开始阅读按钮 */}
+          <Button
+            className="w-full text-white text-lg py-3 font-semibold transition duration-300 ease-in-out"
+            onClick={startReading}
+          >
+            开始阅读
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // 小说内容页
+  const NovelContentPage: React.FC<{
+    nextWord: string;
+    handleNextWord: (word: string) => void;
+    toggleSettings: () => void;
+  }> = ({ nextWord, handleNextWord, toggleSettings }) => {
+    return (
+      <div className="relative w-full h-screen bg-gray-100 text-gray-800 flex-shrink-0 overflow-hidden">
+        <div className="absolute top-4 right-4 z-10">
+          <Button variant="ghost" size="icon" onClick={toggleSettings}>
+            <MoreVertical className="h-6 w-6" />
+          </Button>
+        </div>
+
+        <animated.div
+          {...bindContent()}
+          style={{ x, touchAction: 'none' }}
+          className="h-full w-full"
+        >
+          {currentNovel && renderNovelFragment(currentNovel.fragments[currentFragmentIndex])}
+        </animated.div>
+
+        {/* 导航按钮 */}
+        <div className="absolute bottom-4 left-4 right-4 flex justify-between">
+          <Button
+            variant="ghost"
+            onClick={() => setCurrentFragmentIndex(prev => Math.max(0, prev - 1))}
+            disabled={currentFragmentIndex === 0}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => handleNextPage()}
+            disabled={!currentNovel || currentFragmentIndex === currentNovel.fragments.length - 1}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </div>
+        {/* 阴影蒙版 */}
+        {showSettings && (
+          <div
+            className="absolute inset-0 bg-black bg-opacity-50 transition-opacity duration-500"
+            onClick={() => setShowSettings(false)}
+          />
+        )}
+
+        {/* 设置面板 */}
+        {showSettings && (
+          <animated.div
+            {...bindSettings()}
+            style={{
+              y: y.to(y => `${y}%`),
+              touchAction: 'none',
+            }}
+            className="absolute bottom-0 left-0 right-0 bg-white shadow-lg rounded-t-xl h-1/2"
+          >
+            <div className="p-6 h-full overflow-y-auto">
+              <div className="w-16 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <h3 className="text-xl font-bold mb-4">设置</h3>
+              <p>这里是设置选项的占位符。您可以添加字体大小、背景颜色等设置。</p>
+            </div>
+          </animated.div>
+        )}
+      </div>
+
+    )
+  }
+
+  const fetchNextFragment = async () => {
+    setIsLoading(true)
+    
+    const messages:Message[] = [
+      {
+        role:"system",
+        parts:[{text:"你是一个故事生成器。"}]
+      },
+      {
+        role:"user",
+        parts:[{text:"请继续这个故事。"}]
+      }
+    ]
+    const systemPrompt = "你是一个故事生成器。"
+    await messagesPostToAi(messages,systemPrompt,
+      {
+        onSuccess: (message) => {
+          console.log("message",message)
+          setIsLoading(false);
+          setFragments(prevFragments => [...prevFragments, {title:"",content:message,nextWord:""}])
+          setCurrentFragmentIndex(prevIndex => prevIndex + 1)
+        },
+        onError: (error) => {
+          console.error('发生错误:', error);
+          setIsLoading(false);
+        },
+        onProgress: (chunk) => {
+          console.log("chunk",chunk)
+          setFragments(prevFragments => [...prevFragments, {title:"",content:chunk,nextWord:""}])
+        }
+      }
+    )
+      
+  }
+
+
+  const handleNextPage = async () => {
+    if (currentFragmentIndex === fragments.length - 1) {
+      await fetchNextFragment()
+    } else {
+      setCurrentFragmentIndex(prevIndex => prevIndex + 1)
+    }
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">记忆大师</h1>
-      
-       {/* 生成的故事显示区域 */}
-       {(generatedStory || isGenerating) && (
-        <div className="mt-8">
-          <div
-            ref={storyRef}
-            className="w-full h-auto p-2 border rounded overflow-auto text-sm font-mono tracking-wide text-left align-top whitespace-pre-wrap"
-            style={{
-              transition: 'all 0.5s ease',
-              animation: 'fadeIn 0.5s ease-in-out'
-            }}
-          >
-            {highlightWords(generatedStory.split('## Humanized text')[1])}
-          </div>
-          {isGenerating && (
-            <div className="mt-4">
-              <p className="text-sm">
-                当前进度：
-                { generatedStory.includes('## Humanized text')
-                  ? <span className="animate-pulse">输出故事中<span className="inline-block animate-bounce">...</span></span>
-                  : generatedStory.includes('## Rules to ensure a perfect humanized text')
-                  ? <span className="animate-pulse">组织语言中<span className="inline-block animate-spin">...</span></span>
-                  : <span className="animate-pulse">单词和故事类型分析中<span className="inline-block animate-spin">...</span></span>}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+    <div className="overflow-hidden">
+      <div className={`flex transition-transform duration-500 ease-in-out ${isReading ? '-translate-x-full' : 'translate-x-0'}`}>
+        {/* 封面页 */}
+        {NovelIndexPage({ currentNovel, votes, handleVote, startReading })}
 
-      {/* 生成故事按钮 */}
-      { (
-        <div className="mt-4 flex flex-row gap-2 w-full">
-      <Button 
-        className={`mt-4 ${!isGenerating && generatedStory ? 'w-1/2' : 'w-full'}`}
-        disabled={selectedWords.length === 0 || !selectedStoryType || isGenerating}
-        onClick={generateStory}
-        
-      >
-        {isGenerating ? "正在生成故事..." : "生成故事"}
-      </Button>
-      {!isGenerating && generatedStory &&<Button 
-        className="mt-4 w-1/2"
-        onClick={() => setGeneratedStory("")}
-      >
-          复制文本
-        </Button>
-      }
+
+        {/* 小说内容页 */}
+        {NovelContentPage({ nextWord: "", handleNextWord: () => { }, toggleSettings: toggleSettings })}
+
+
       </div>
-      )}
-
-
-      {/* 单词选择区域 */}
-      <div className="mb-8">
-        <h2 className="text-xl sm:text-2xl font-semibold mb-4 mt-4">选择今日单词（最多10个）</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 h-[200px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
-          {words.map((word, index) => (
-            <Button
-              key={index}
-              variant={selectedWords.includes(word) ? "default" : "outline"}
-              onClick={() => handleWordSelection(word)}
-              className="w-full h-auto py-3  sm:text-sm truncate"
-            >
-              {word.english}
-              <div className="sm:text-[15px] ml-2 text-[10px]">
-                {word.translations[0].chinese}
-              </div>
-            </Button>
-          ))}
-        </div>
-        <div className="mt-2 text-sm">已选择 {selectedWords.length}/10 个单词</div>
-      </div>
-
-      {/* 故事类型选择区域 */}
-      <div className="mb-8">
-        <h2 className="text-xl sm:text-2xl font-semibold mb-4">选择故事类型</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-2 gap-2">
-          {storyTypes.map((type, index) => (
-            <Button
-              key={index}
-              variant={selectedStoryType === type.title ? "default" : "outline"}
-              onClick={() => handleStoryTypeSelection(type.title)}
-              className="w-full h-auto py-2 flex flex-col items-center justify-center text-center"
-            >
-              <span className="font-bold text-sm" title={type.description}>{type.title}</span>
-              {/* <span className="text-[10px] mt-1 break-words w-full px-2 whitespace-normal">{type.description}</span> */}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      
     </div>
+
+
   )
 }
