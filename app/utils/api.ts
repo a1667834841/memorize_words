@@ -9,6 +9,7 @@ interface CallbackOptions {
 export const messagesPostToAi = async (
   messages: Message[],
   systemPrompt: string,
+  jsonMode: boolean,
   callbacks?: CallbackOptions
 ): Promise<void> => {
   try {
@@ -17,7 +18,7 @@ export const messagesPostToAi = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages: messages, systemPrompt: systemPrompt }),
+      body: JSON.stringify({ messages: messages, systemPrompt: systemPrompt, jsonMode: jsonMode }),
     });
 
     if (!response.ok) {

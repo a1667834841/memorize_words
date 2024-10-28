@@ -9,7 +9,7 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: Request) {
-  const { messages,systemPrompt } = await req.json();
+  const { messages,systemPrompt,jsonMode } = await req.json();
   const openaiMessages = messages.map((message: any) => ({
     role: message.role === 'user' ? 'user' : 'assistant',
     content: message.parts.map((part: any) => part.text).join(''),
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         messages: realMessages,
         // 设置温度
         temperature: 1,
-        // response_format: { type: 'json_object' }
+        response_format: { type: jsonMode ? 'json_object' : 'text' }
       });
 
       for await (const chunk of response) {

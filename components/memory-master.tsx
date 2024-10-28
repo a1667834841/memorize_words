@@ -265,7 +265,7 @@ export function MemoryMasterComponent() {
       }
     ]
     const systemPrompt = "你是一个故事生成器。"
-    await messagesPostToAi(messages,systemPrompt,
+    await messagesPostToAi(messages,systemPrompt,false,
       {
         onSuccess: (message) => {
           console.log("message",message)

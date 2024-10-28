@@ -196,7 +196,7 @@ export function useNovel() {
       return;
     }
 
-    await messagesPostToAi(messages, novelPromptTemplate(currentNovel), {
+    await messagesPostToAi(messages, novelPromptTemplate(currentNovel), true, {
       onSuccess: (message) => {
         if (message.startsWith('{') && message.endsWith('}')) {
           const jsonData = JSON.parse(message);
