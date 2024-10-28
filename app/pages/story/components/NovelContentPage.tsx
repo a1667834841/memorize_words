@@ -109,7 +109,7 @@ export const NovelContentPage: React.FC<NovelContentPageProps> = ({
       </div>
 
       <animated.div
-        {...bindContent()}
+        // {...bindContent()}
         style={{ x, touchAction: 'none' }}
         className="h-full w-full overflow-y-auto"
         onTouchStart={(e) => {
@@ -136,7 +136,7 @@ export const NovelContentPage: React.FC<NovelContentPageProps> = ({
           </span>
   
           <p className="text-lg leading-relaxed">
-            {currentFragment.content.split('\n').map((line, index) => (
+            {currentFragment.content && currentFragment.content.split('\n').map((line, index) => (
               <React.Fragment key={index}>
                 {line}
                 <br />

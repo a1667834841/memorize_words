@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronRight, Settings, Home as HomeIcon, Book, MessageCircle, BookOpen, Gamepad } from 'lucide-react'
 import Home from '@/app/home'
 import { WordMatchingGameComponent } from '@/components/word-matching-game'
-import { DailyVocabularyComponent } from '@/components/daily-vocabulary'
-import { MemoryMasterComponent } from '@/components/memory-master'
 import { BackButton } from '@/components/BackButton'
 import { NextButton } from '@/components/NextButton'
 import { VocabularyBookComponent } from '@/components/vocabulary-book'
 import { Word } from '@/lib/types/words'
 import TodayDialogComponent from './today-dialog';
 import StoryPage from '@/app/pages/story/page';
+import Link from 'next/link'
+import  DailyPage  from '@/app/pages/daily/page'
 
 // 定义 GlobalCache 接口
 export interface GlobalCache {
@@ -56,8 +56,18 @@ export type Page = {
 // 更新 pages 数组
 export const pages: Page[] = [
   { name: "首页", route: 'home', enable: true, display:false, description: "首页", component: Home, icon: <HomeIcon />, hasBackButton: false, hasNextButton: false },
-  { name: "今日单词", route: 'dailyVocabulary', enable: true, display:true, description: "查看今日单词进行学习", component: DailyVocabularyComponent, icon: <Book />, hasBackButton: true, hasNextButton: true },
-  { name: "24小时便利店", route: 'memoryGame', enable: true, display:true, description: "cici日常便利店兼职故事", component: StoryPage, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
+  { 
+    name: "今日单词", 
+    route: 'daily', // 修改这里，去掉前导斜杠
+    enable: true, 
+    display: true, 
+    description: "查看今日单词进行学习", 
+    component: DailyPage, 
+    icon: <Book />, 
+    hasBackButton: true, 
+    hasNextButton: true 
+  },
+  { name: "cici便利店", route: 'story', enable: true, display: true, description: "cici日常便利店兼职故事", component: StoryPage, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
   { name: "情景对话", route: "todayDialog", enable: true, display:true, description: "与超自然ai对话", component: TodayDialogComponent, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
   { name: "消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分", component: WordMatchingGameComponent, icon: <Gamepad />, hasBackButton: true, hasNextButton: false },
   { name: "单词本", route: 'vocabularyBook', enable: true, display:true, description: "查看单词本", component: VocabularyBookComponent, icon: <BookOpen />, hasBackButton: true, hasNextButton: false },
@@ -108,19 +118,24 @@ export function AppRouter() {
           <p className="text-xs text-gray-600 text-center mb-6">每天一点点，英语进步大步跳 🚀</p>
           <div className="grid grid-cols-2 gap-4 mt-5 ">
             {pages.filter(page => page.display).map((page) => (
-              <motion.div
-                key={page.route}
-                whileHover={{ backgroundColor: '#f0f0f0' }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white p-4 mt-4 rounded-lg shadow-md flex items-center justify-between cursor-pointer text-xs xs:text-md"
-                onClick={() => navigateTo(page)}
+              <Link 
+                key={page.route} 
+                href={`/pages/${page.route}`} // 修改这里，添加完整的路径
+                className="block"
               >
-                <div className="flex items-center">
-                  {page.icon}
-                  <span className="ml-2">{page.name}</span>
-                </div>
-                <ChevronRight className="text-gray-400" />
-              </motion.div>
+                <motion.div
+                  whileHover={{ backgroundColor: '#f0f0f0' }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-white p-4 mt-4 rounded-lg shadow-md flex items-center justify-between cursor-pointer text-xs xs:text-md"
+                  // onClick={() => navigateTo(page)}
+                >
+                  <div className="flex items-center">
+                    {page.icon}
+                    <span className="ml-2">{page.name}</span>
+                  </div>
+                  <ChevronRight className="text-gray-400" />
+                </motion.div>
+              </Link>
             ))}
           </div>
         </motion.div>
@@ -150,7 +165,7 @@ export function AppRouter() {
   }
 
   return (
-    <div className=" mx-auto bg-gray-100 min-h-screen  items-center justify-center">
+    <div className="mx-auto bg-gray-100 min-h-screen items-center justify-center">
       <AnimatePresence mode="wait">
         {renderPage()}
       </AnimatePresence>

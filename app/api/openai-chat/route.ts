@@ -31,6 +31,7 @@ export async function POST(req: Request) {
         messages: realMessages,
         // 设置温度
         temperature: 1,
+        // response_format: { type: 'json_object' }
       });
 
       for await (const chunk of response) {

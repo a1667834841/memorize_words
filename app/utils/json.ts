@@ -23,7 +23,7 @@ if (quotes % 2 !== 0) {
   try {
     return JSON.parse(chunk);
   } catch (error) {
-    console.error("无法解析JSON，即使在尝试补全后:", error);
+    console.error("chunk",chunk,"无法解析JSON，即使在尝试补全后:", error);
     return null;
   }
 };

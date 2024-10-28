@@ -17,6 +17,8 @@ import { Message } from '@/lib/types/message';
 
 let globalRecognizer: speechsdk.SpeechRecognizer | null = null;
 let globalSpeechSynthesizer: speechsdk.SpeechSynthesizer | null = null;
+let player :speechsdk.SpeakerAudioDestination | null = null;
+
 let tokenExpirationTime: number = 0;
 
 
@@ -204,8 +206,10 @@ const TodayDialogComponent: React.FC<TodayDialogProps> = ({ navigateTo }) => {
     const speechConfig = speechsdk.SpeechConfig.fromAuthorizationToken(token, region);
     // zh-CN-XiaoyuMultilingualNeural
     // zh-CN-XiaoxiaoMultilingualNeural
+    player = new speechsdk.SpeakerAudioDestination();
     speechConfig.speechSynthesisVoiceName = 'zh-CN-XiaochenMultilingualNeural'
-    const audioConfig = speechsdk.AudioConfig.fromDefaultSpeakerOutput();
+    const audioConfig = speechsdk.AudioConfig.fromSpeakerOutput(player);
+
     
 
     return new SpeechSynthesizer(speechConfig, audioConfig);

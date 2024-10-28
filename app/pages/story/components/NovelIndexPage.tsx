@@ -1,8 +1,10 @@
+'use client'
 import React from 'react';
 import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { Novel } from '../types/novel';
 import { ThumbsUp, Meh, ThumbsDown, BookOpen, Badge, Tag, User, Star } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface NovelIndexPageProps {
   currentNovel: Novel | null;
@@ -11,14 +13,16 @@ interface NovelIndexPageProps {
   startReading: () => void;
 }
 
-export const NovelIndexPage: React.FC<NovelIndexPageProps> = ({ currentNovel, votes, handleVote, startReading }) => {
+export function NovelIndexPage({ currentNovel, votes, handleVote, startReading }: NovelIndexPageProps) {
+  const router = useRouter(); // 初始化 useRouter
+
   if (!currentNovel) {
     return <div className="flex justify-center items-center h-screen">加载中...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-100  w-full">
-      <div className="w-full h-full bg-white rounded-lg overflow-hidden shadow-lg">
+    <div className="min-h-screen bg-gray-100 w-full">
+      <div className="w-full min-h-screen bg-white rounded-lg overflow-hidden shadow-lg">
         <div className="relative h-72 bg-gray-200">
           <img
             src={`${currentNovel.coverImage}`}
@@ -26,7 +30,7 @@ export const NovelIndexPage: React.FC<NovelIndexPageProps> = ({ currentNovel, vo
             className="w-full h-full object-cover"
           />
         </div>
-        <div className="p-6 ">
+        <div className="p-6">
           <h1 className="text-2xl font-bold mb-2">{currentNovel.title}</h1>
           <div className="flex items-center mb-4">
             <User className="w-4 h-4 mr-2" />
@@ -52,15 +56,14 @@ export const NovelIndexPage: React.FC<NovelIndexPageProps> = ({ currentNovel, vo
             <Button variant="outline" size="sm">一般 (0)</Button>
             <Button variant="outline" size="sm">不行 (0)</Button>
           </div>
-          <Button className="w-full mb-4 mt-4 "
+          <Button className="w-full mb-4 mt-4"
             onClick={startReading}
           >
-            <BookOpen className="w-4 h-4 mr-2" 
-            />
+            <BookOpen className="w-4 h-4 mr-2" />
             开始阅读
           </Button>
-          <Button variant="secondary" className="w-full"
-            onClick={() => window.location.href = '/'}
+          <Button variant="secondary" className="w-full cursor-pointer hover:bg-white hover:text-black"
+            onClick={() => router.push('/')} // 使用 useRouter 跳转到首页
           >
             退出阅读
           </Button>
