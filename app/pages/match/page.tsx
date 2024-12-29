@@ -1,19 +1,19 @@
 "use client"
 
-import { WordButtonProps } from './types'
 import { useWordMatchGame } from './hooks/useWordMatchGame'
 import { GameBoard } from './components/GameBoard'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import Confetti from 'react-confetti'
-import { pages } from '@/components/app-router'
+import { useRouter } from 'next/navigation'
 import { NavBar } from '@/components/NavBar'
 
-export  function WordMatchingGamePage(props: WordButtonProps) {
+export default function WordMatchingGamePage() {
   const { gameState, actions } = useWordMatchGame()
+  const router = useRouter()
 
   const goBack = () => {
-    props.navigateTo(pages[0])
+    router.push('/')
   }
 
   return (

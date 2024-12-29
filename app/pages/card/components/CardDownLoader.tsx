@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { MdOutlineConnectWithoutContact } from "react-icons/md";
 import { BiBookOpen } from "react-icons/bi";
-import domtoimage from 'dom-to-image-more';
+import domtoimage from "dom-to-image-more";
 import JSZip from 'jszip';
 import { toast } from 'sonner';
 import { Toaster } from 'sonner';
