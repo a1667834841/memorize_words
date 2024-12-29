@@ -18,6 +18,13 @@ if (quotes % 2 !== 0) {
     chunk = '{'.repeat(rightBraces - leftBraces) + chunk;
   }
 
+  // chunk中最后一个}，如果前面有,则移除
+  chunk = chunk.replace(/\,\s*}$/g, '}');
+  // 在:后面直接跟}的情况下，补充""
+  chunk = chunk.replace(/:(?=\s*})/g, ':""');
+
+  // 处理只有键名的情况，补充:""
+  // chunk = chunk.replace(/"(\w+)"(?=\s*})/g, '"$1":""');
 
   // 尝试解析JSON
   try {

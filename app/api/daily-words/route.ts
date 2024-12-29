@@ -122,6 +122,12 @@ async function getRandomWords(date: string): Promise<any> {
 }
 
 async function saveDailyWords(rawWords:any,today:string) {
+
+  // 如果rawWords中 相同word、type,只取一条
+  rawWords = rawWords.filter((word:any,index:number,self:any) => 
+    self.findIndex((t:any) => t.word === word.word && t.type === word.type) === index
+  )
+
   await prisma.dailyWords.createMany({
     data: rawWords.map((word:any) => ({
       word: word.word,

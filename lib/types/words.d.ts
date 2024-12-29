@@ -44,3 +44,9 @@ export interface Pagination {
   totalCount: number;
   currentPage: number;
 }
+
+// 单词联想
+export interface WordAssociation {
+  word: string;
+  association: string;
+}

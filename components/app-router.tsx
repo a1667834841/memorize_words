@@ -13,6 +13,8 @@ import TodayDialogComponent from './today-dialog';
 import StoryPage from '@/app/pages/story/page';
 import Link from 'next/link'
 import  DailyPage  from '@/app/pages/daily/page'
+import WordDisplay from '@/app/pages/display/WordDisplay'
+import DisplayPage from '@/app/pages/display/page'
 
 // 定义 GlobalCache 接口
 export interface GlobalCache {
@@ -67,11 +69,22 @@ export const pages: Page[] = [
     hasBackButton: true, 
     hasNextButton: true 
   },
+  {
+    name: "单词联想",
+    route: "display",
+    enable: true,
+    display: true,
+    description: "单词联想",
+    component: DisplayPage,
+    icon: <BookOpen />,
+    hasBackButton: true,
+    hasNextButton: false
+  },
   { name: "cici便利店", route: 'story', enable: true, display: true, description: "cici日常便利店兼职故事", component: StoryPage, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
-  { name: "情景对话", route: "todayDialog", enable: true, display:true, description: "与超自然ai对话", component: TodayDialogComponent, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
-  { name: "消消乐", route: 'wordMatchingGame', enable: true, display:true, description: "通过匹配单词和释义来得分", component: WordMatchingGameComponent, icon: <Gamepad />, hasBackButton: true, hasNextButton: false },
-  { name: "单词本", route: 'vocabularyBook', enable: true, display:true, description: "查看单词本", component: VocabularyBookComponent, icon: <BookOpen />, hasBackButton: true, hasNextButton: false },
-  { name: "设置", route: 'settings', enable: true, display:true, description: "应用设置", component: null, icon: <Settings />, hasBackButton: true, hasNextButton: false },
+  { name: "情景对话", route: "talk", enable: true, display:true, description: "与超自然ai对话", component: TodayDialogComponent, icon: <MessageCircle />, hasBackButton: true, hasNextButton: false },
+  { name: "消消乐", route: 'match', enable: true, display:true, description: "通过匹配单词和释义来得分", component: WordMatchingGameComponent, icon: <Gamepad />, hasBackButton: true, hasNextButton: false },
+  { name: "单词本", route: 'vocabulary', enable: true, display:false, description: "查看单词本", component: VocabularyBookComponent, icon: <BookOpen />, hasBackButton: true, hasNextButton: false },
+  { name: "设置", route: 'setting', enable: true, display:true, description: "应用设置", component: null, icon: <Settings />, hasBackButton: true, hasNextButton: false },
 ]
 
 

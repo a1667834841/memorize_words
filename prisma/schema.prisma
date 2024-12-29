@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,45 +7,43 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 单词模型
 model Words {
-  id          Int      @id @default(autoincrement())
-  word        String   @db.VarChar(255)  // 单词
-  translation String   @db.Text          // 翻译
-  type        String?  @db.VarChar(50)   // 单词类型（可选）
+  id          Int     @id @default(autoincrement())
+  word        String  @db.VarChar(255)
+  translation String  @db.Text
+  type        String? @db.VarChar(50)
 
-  @@index([word])   // 单词索引
-  @@index([type])   // 类型索引
-
+  @@index([word])
+  @@index([type])
   @@map("words")
 }
 
-// 短语模型
 model Phrases {
-  id          Int      @id @default(autoincrement())
-  word        String   @db.VarChar(255)  // 关联的单词
-  phrase      String   @db.VarChar(255)  // 短语
-  translation String   @db.Text          // 翻译
+  id          Int    @id @default(autoincrement())
+  word        String @db.VarChar(255)
+  phrase      String @db.VarChar(255)
+  translation String @db.Text
 
-  @@index([word, phrase]) 
-  
-  @@map("phrases") // 单词和短语的复合索引
+  @@index([word, phrase])
+  @@map("phrases")
 }
 
-// 每日单词记录模型
 model DailyWords {
-  id    Int      @id @default(autoincrement())
-  word  String   @db.VarChar(255)  // 单词
-  translation String   @db.VarChar(255)  // 翻译
-  type  String?  @db.VarChar(50)   // 单词类型（可选）
-  date  String?  @db.VarChar(32) // 日期
+  id          Int     @id @default(autoincrement())
+  word        String  @db.VarChar(255)
+  translation String  @db.VarChar(255)
+  type        String? @db.VarChar(50)
+  date        String? @db.VarChar(32)
 
-  @@index([date])         // 日期索引，方便按日期查询
+  @@index([date])
   @@map("daily_words")
 }
 
+model WordAssociations {
+  id          Int    @id @default(autoincrement())
+  word        String @db.VarChar(255)
+  association String @db.VarChar(2048)
 
-
-
-
-
+  @@index([word])
+  @@map("word_associations")
+}
