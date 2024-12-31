@@ -55,12 +55,12 @@ export default function TalkPage() {
         }
     }, [words])
 
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            setCopiedText(text)
-            setTimeout(() => setCopiedText(null), 1000)
-        })
-    }
+    const handleCopy = () => {
+        if (typeof window === 'undefined') return;
+
+        const content = `...`;
+        navigator.clipboard.writeText(content);
+    };
 
     const handleRecordSwitch = () => {
         if (!isRecording) {

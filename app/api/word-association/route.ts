@@ -9,6 +9,8 @@ const openai = new OpenAI({
   baseURL: process.env.OPENAI_API_URL
 });
 
+export const dynamic = 'force-dynamic'
+
 // 获取OpenAI联想数据
 async function getOpenAIAssociation(word: string) {
   try {

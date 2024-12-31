@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
 export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
   const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
   
   // 正则表达式匹配常见的移动设备标识
