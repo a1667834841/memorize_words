@@ -84,9 +84,10 @@ export function CardDownLoadButton({ params, className, batchParams }: CardDownL
             ctx.fillRect(0, 0, canvas.width, canvas.height)
 
             // 绘制半透明卡片背景（带阴影和毛玻璃效果）
-            const cardMargin = 60
+            const cardMargin = 80
+            const cardHeightMargin = 60
             const cardWidth = canvas.width - (cardMargin * 2)
-            const cardHeight = canvas.height - (cardMargin * 2)
+            const cardHeight = canvas.height - (cardHeightMargin * 2)
 
             // 保存上下文状态
             ctx.save()
@@ -112,9 +113,6 @@ export function CardDownLoadButton({ params, className, batchParams }: CardDownL
             ctx.roundRect(cardMargin, cardMargin, cardWidth, cardHeight, 20)
             ctx.fill()
 
-            
-
-    
 
             // 恢复上下文状态
             ctx.restore()
@@ -247,7 +245,7 @@ export function CardDownLoadButton({ params, className, batchParams }: CardDownL
                 cardMargin + 60,
                 currentY,
                 sentenceBoxWidth,
-                Math.max(contentHeight, 200), // 确保最小高度
+                Math.max(contentHeight, 250), // 确保最小高度
                 10
             )
             ctx.fill()

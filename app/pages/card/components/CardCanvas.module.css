@@ -9,8 +9,8 @@
 .canvas {
     /* width: 900px;
     height: 1200px; */
-    max-width: 90%;
-    max-height: 90%;
+    max-width: 100%;
+    max-height: 120%;
     /* border: 2px solid #ddd; */
     box-shadow: 0 10px 30px rgba(0,0,0,0.3),
                 0 15px 50px rgba(0,0,0,0.2),
