@@ -94,15 +94,22 @@ const WordDisplay: React.FC = () => {
 
 
   if (!currentWord) {
-    return <div>加载中...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+          <div className="text-gray-500">加载中...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fafafa]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <NavBar
         title="单词联想"
         subtitle=""
-        className="font-bubblegum"
+        className="font-bubblegum bg-white/80 backdrop-blur-sm shadow-sm"
       />
 
       <main className="flex-1 flex flex-col items-center px-4 py-8 gap-8">
@@ -112,7 +119,8 @@ const WordDisplay: React.FC = () => {
             isExpanded ? styles.expanded : '',
             'grid',
             `grid-cols-${currentWord.associations.length}`,
-            'w-full'
+            'w-full bg-white rounded-xl shadow-lg p-8 transition-all duration-300 hover:shadow-xl',
+            'border border-gray-100'
           )}
             onClick={handleClick}>
             {currentWord.associations.map((part, index) => (
@@ -163,20 +171,21 @@ const WordDisplay: React.FC = () => {
 
         <section className={cn(
           styles.associationArea,
-          isExpanded ? styles.expanded : '',
+          isExpanded ? styles.expanded : 'hidden',
           'w-full max-w-4xl space-y-6 font-comic'
         )}>
-          <div className="space-y-2 rounded-lg p-4 shadow-sm">
+          <div className="space-y-2 bg-white rounded-xl p-6 shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl">
             <div className={cn(
               "flex items-center gap-2",
-              isMobile ? "gap-1 text-xl" : "text-2xl"
+              isMobile ? "gap-1 text-xl" : "text-2xl",
+              "text-gradient bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
             )}>
-              <MdOutlineConnectWithoutContact className={cn("text-black-600")} />
+              <MdOutlineConnectWithoutContact className={cn("text-blue-600")} />
               <span>联想</span>
             </div>
             <div className={cn(
               styles.associationContent,
-              "bg-white p-4 rounded-lg shadow-sm"
+              "bg-gray-50/50 p-6 rounded-lg shadow-sm"
             )}>
               {currentWord.associations.map((item, index) => (
                 <span key={index} className={cn(
@@ -194,26 +203,28 @@ const WordDisplay: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-2  rounded-lg p-4 shadow-sm">
+          <div className="space-y-2 bg-white rounded-xl p-6 shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl">
             <div className={cn(
               "flex items-center gap-2",
-              isMobile ? "gap-1 text-xl" : "text-2xl"
+              isMobile ? "gap-1 text-xl" : "text-2xl",
+              "text-gradient bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
             )}>
-              <BiBookOpen className={cn("text-black-600")} />
+              <BiBookOpen className={cn("text-blue-600")} />
               <span>联想句子</span>
             </div>
             <p className={cn(
-              "text-gray-600 tracking-wide bg-white p-4 rounded-lg leading-loose",
+              "text-gray-600 tracking-wide bg-gray-50/50 p-4 rounded-lg leading-loose letter-spacing-2",
               isMobile ? "text-sm" : "text-lg"
             )}>{currentWord.sentence}</p>
           </div>
 
-          <div className="space-y-2  rounded-lg p-4 shadow-sm">
+          <div className="space-y-2 bg-white rounded-xl p-6 shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl">
             <div className={cn(
               "flex items-center gap-2",
-              isMobile ? "gap-1 text-xl" : "text-2xl"
+              isMobile ? "gap-1 text-xl" : "text-2xl",
+              "text-gradient bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
             )}>
-              <BsPencilSquare className={cn("text-black-600")} />
+              <BsPencilSquare className={cn("text-blue-600")} />
               <span>你的理解</span>
             </div>
             <div className={cn(
@@ -221,13 +232,13 @@ const WordDisplay: React.FC = () => {
               isExpanded ? styles.expanded : '',
               isMobile ? "px-0" : ""
             )}>
-              <div className="relative flex bg-white rounded-lg mb-4">
+              <div className="relative flex bg-white rounded-lg">
                 <textarea
                   value={userInput}
                   onChange={handleInputChange}
                   placeholder="请输入你对这个单词的理解..."
                   className={cn(
-                    "w-full min-h-[100px] p-4 pr-12  rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-black-500 focus:border-transparent bg-white ",
+                    "w-full min-h-[100px] p-4 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-black-500 focus:border-transparent bg-white",
                     isMobile ? "text-sm" : ""
                   )}
                   style={{
@@ -240,7 +251,7 @@ const WordDisplay: React.FC = () => {
                     target.style.height = target.scrollHeight + 'px';
                   }}
                 />
-                <div className="absolute right-2 bottom-1 flex gap-2">
+                <div className={styles['button-container']}>
                   <button
                     onClick={handleSubmit}
                     disabled={isLoading || !userInput.trim()}
@@ -248,7 +259,7 @@ const WordDisplay: React.FC = () => {
                   >
                     <BiSend className={cn(
                       isLoading ? 'animate-pulse' : '',
-                      userInput.trim() ? 'text-black-600' : 'text-gray-400',
+                      userInput.trim() ? 'text-blue-600' : 'text-blue-400',
                       isMobile ? "text-xl" : "text-2xl"
                     )} />
                   </button>
@@ -263,39 +274,73 @@ const WordDisplay: React.FC = () => {
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <button
                 onClick={handlePrevWord}
-                className="p-3 rounded-full bg-white shadow-md hover:bg-gray-50 transition-colors"
+                className="p-4 rounded-full bg-white shadow-lg hover:bg-blue-50 transition-all duration-300 hover:shadow-xl border border-gray-100 group"
               >
-                <IoIosArrowBack className="text-2xl text-gray-600" />
+                <IoIosArrowBack className="text-2xl text-blue-600 group-hover:scale-110 transition-transform duration-300" />
               </button>
               <button
                 onClick={handleNextWord}
-                className="p-3 rounded-full bg-white shadow-md hover:bg-gray-50 transition-colors"
+                className="p-4 rounded-full bg-white shadow-lg hover:bg-blue-50 transition-all duration-300 hover:shadow-xl border border-gray-100 group"
               >
-                <IoIosArrowForward className="text-2xl text-gray-600" />
+                <IoIosArrowForward className="text-2xl text-blue-600 group-hover:scale-110 transition-transform duration-300" />
               </button>
             </div>
           </div>
         )}
 
         {isMobile && (
-          <div className=" bottom-0 left-0 right-0  px-2 py-2 flex items-center justify-end gap-2 z-50 text-sm">
-            <button
-              onClick={handlePrevWord}
-              className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <IoIosArrowBack className="text-xl text-gray-600" />
-            </button>
+          <>
+            <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center gap-4 mb-4 z-[10] px-4">
+              <div className="bg-white/80 backdrop-blur-sm rounded-full shadow-lg border border-gray-100 p-2 flex items-center gap-4">
+                <button
+                  onClick={handlePrevWord}
+                  className="p-3 rounded-full hover:bg-blue-50 transition-all duration-300 group"
+                >
+                  <IoIosArrowBack className="text-xl text-blue-600 group-hover:scale-110 transition-transform duration-300" />
+                </button>
 
-            <div className="text-xs text-gray-500">
-              {currentWordIndex + 1} / {wordAssociationDatas.length}
+                <div className="text-sm font-medium text-gray-600 min-w-[3rem] text-center">
+                  {currentWordIndex + 1} / {wordAssociationDatas.length}
+                </div>
+
+                <button
+                  onClick={handleNextWord}
+                  className="p-3 rounded-full hover:bg-blue-50 transition-all duration-300 group"
+                >
+                  <IoIosArrowForward className="text-xl text-blue-600 group-hover:scale-110 transition-transform duration-300" />
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={handleNextWord}
-              className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <IoIosArrowForward className="text-xl text-gray-600" />
-            </button>
+            <div className="fixed bottom-5 right-4 z-[10]">
+              <CardDownLoadButton
+                params={{
+                  title: currentWord.originalWord.word,
+                  subtitle: currentWord.originalWord.type + '.' + currentWord.originalWord.meaning,
+                  guidelines: currentWord.associations.map(p =>
+                    `${p.part.replace('-', '')} ${p.partMeaning} → ${p.word} ${p.type} ${p.meaning}`
+                  ),
+                  content: currentWord.sentence,
+                  source: '我要记单词'
+                }}
+                className="p-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                batchParams={{
+                  words: wordAssociationDatas.map(p => ({
+                    title: p.originalWord.word,
+                    subtitle: p.originalWord.type + '.' + p.originalWord.meaning,
+                    guidelines: p.associations.map(p =>
+                      `${p.part.replace('-', '')} ${p.partMeaning} → ${p.word} ${p.type} ${p.meaning}`
+                    ),
+                    content: p.sentence,
+                    source: '我要记单词'
+                  }))
+                }}
+              />
+            </div>
+          </>
+        )}
+        {!isMobile && (
+          <div className="fixed bottom-10 right-10 z-[10]">
             <CardDownLoadButton
               params={{
                 title: currentWord.originalWord.word,
@@ -306,7 +351,7 @@ const WordDisplay: React.FC = () => {
                 content: currentWord.sentence,
                 source: '我要记单词'
               }}
-              className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              className="p-4 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               batchParams={{
                 words: wordAssociationDatas.map(p => ({
                   title: p.originalWord.word,
@@ -319,38 +364,9 @@ const WordDisplay: React.FC = () => {
                 }))
               }}
             />
-
           </div>
-          
-         )} 
-         {!isMobile && (
-         <div className="fixed bottom-10 right-10">
-          <CardDownLoadButton
-                params={{
-                  title: currentWord.originalWord.word,
-                  subtitle: currentWord.originalWord.type + '.' + currentWord.originalWord.meaning,
-                  guidelines: currentWord.associations.map(p =>
-                    `${p.part.replace('-', '')} ${p.partMeaning} → ${p.word} ${p.type} ${p.meaning}`
-                  ),
-                  content: currentWord.sentence,
-                  source: '我要记单词'
-                }}
-                className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors z-50"
-                batchParams={{
-                  words: wordAssociationDatas.map(p => ({
-                    title: p.originalWord.word,
-                    subtitle: p.originalWord.type + '.' + p.originalWord.meaning,
-                    guidelines: p.associations.map(p =>
-                      `${p.part.replace('-', '')} ${p.partMeaning} → ${p.word} ${p.type} ${p.meaning}`
-                    ),
-                    content: p.sentence,
-                    source: '我要记单词'
-                  }))
-                }}
-            />
-         </div>
-         )}
-         
+        )}
+
       </main>
     </div>
   );
