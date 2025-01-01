@@ -92,9 +92,9 @@ export function CardDownLoadButton({ params, className, batchParams }: CardDownL
             ctx.save()
 
             // 1. 先绘制带强阴影的不透明底层
-            ctx.shadowColor = 'rgba(0, 0, 0, 1)'
-            ctx.shadowBlur = 80
-            ctx.shadowOffsetY = 40
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+            ctx.shadowBlur = 30
+            ctx.shadowOffsetY = 20
             // ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
             ctx.beginPath()
             ctx.roundRect(cardMargin, cardMargin, cardWidth, cardHeight, 20)
@@ -106,20 +106,15 @@ export function CardDownLoadButton({ params, className, batchParams }: CardDownL
             ctx.shadowOffsetY = 0
 
             // 3. 添加毛玻璃效果层
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
-            ctx.filter = 'blur(30px)'  // 添加模糊效果
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+            // ctx.filter = 'blur(30px)'  // 添加模糊效果
             ctx.beginPath()
             ctx.roundRect(cardMargin, cardMargin, cardWidth, cardHeight, 20)
             ctx.fill()
 
             
 
-            // 4. 添加边框
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'
-            ctx.lineWidth = 1
-            ctx.beginPath()
-            ctx.roundRect(cardMargin, cardMargin, cardWidth, cardHeight, 20)
-            ctx.stroke()
+    
 
             // 恢复上下文状态
             ctx.restore()
