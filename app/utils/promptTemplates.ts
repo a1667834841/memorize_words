@@ -29,7 +29,7 @@ export const associationPromptTemplate = (word: string) => `
 ## 输出格式
 输出结果需要用JSON格式，包含以下字段：
 - "originalWord": { "word": 原始单词, "type": 词性, "meaning": 中文解释 }
-- "associations": [{ "part":拆分后的词根、前缀或后缀,"partMeaning": 对应尽量详细的中文解释, "type": 词性缩写(n.名词, v.动词, adj.形容词, adv.副词, prep.介词, conj.连词, interj.感叹词), "word": part对应熟悉的单词, "meaning": word对应中文解释 }]
+- "associations": [{ "part":拆分后的词根、前缀或后缀,"partMeaning": part对应中文解释,字数限制在6个字以内, "type": 词性缩写(n.名词, v.动词, adj.形容词, adv.副词, prep.介词, conj.连词, interj.感叹词), "word": part对应熟悉的单词, "meaning": word对应中文解释 }]
 - "sentence": 使用中文造句，造句必须要是一件描述性的事情，并在句子中包含需要记忆的单词和associations中的单词，这些需要在句子中以英文出现，单词需要使用（）括起来，单词前面对应着单词的解释，例如：错误的（incorrect）
 
 给定单词：${word}
